@@ -59,6 +59,24 @@ class MemoryWalletDelegate implements WalletDelegate {
     _out.add(_local);
   }
 
+  final _phone = <String, String>{};
+
+  @override
+  Future<String?> loadLocal(String uid) async => _phone[uid];
+
+  @override
+  Future<void> saveLocal(String uid, String? text) async => text == null ? _phone.remove(uid) : _phone[uid] = text;
+
+  @override
+  Future<void> settled() async {
+    while (_queue.isNotEmpty || !_online) {
+      await Future<void>.delayed(const Duration(milliseconds: 200));
+    }
+  }
+
+  @override
+  Future<bool?> entryOnServer(String uid, String id) async => _ledger.containsKey(id);
+
   @override
   String newEntryId(String uid) => 'e${DateTime.now().microsecondsSinceEpoch}-${++_ids}';
 

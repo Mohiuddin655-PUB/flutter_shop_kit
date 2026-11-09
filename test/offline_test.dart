@@ -79,4 +79,42 @@ void main() {
     await ShopKit.clear();
     expect(ShopKit.wallet.refusals, isEmpty);
   });
+
+  test('a spend refused after the app was closed is told at the next start', () async {
+    final t = await TestShopKit.make();
+    t.delegate.online = false;
+    await ShopKit.inventory.buy('a1', 100);
+    await t.reopen();
+    t.delegate.refuse = (_) => true;
+    t.delegate.goOnline();
+    for (var i = 0; i < 5; i++) {
+      await Future<void>.delayed(const Duration(milliseconds: 5));
+    }
+    expect([for (final r in ShopKit.wallet.refusals) (r.ref, r.price)], [('a1', 100)]);
+    expect(t.delegate.phone, isEmpty);
+  });
+
+  test('a spend taken after the app was closed is not told', () async {
+    final t = await TestShopKit.make();
+    t.delegate.online = false;
+    await ShopKit.inventory.buy('a1', 100);
+    await t.reopen();
+    t.delegate.goOnline();
+    for (var i = 0; i < 5; i++) {
+      await Future<void>.delayed(const Duration(milliseconds: 5));
+    }
+    expect(ShopKit.wallet.refusals, isEmpty);
+    expect(ShopKit.inventory.owns('a1'), isTrue);
+    expect(t.delegate.phone, isEmpty);
+  });
+
+  test('a spend answered while the app is open leaves nothing on the phone', () async {
+    final t = await TestShopKit.make();
+    await ShopKit.inventory.buy('a1', 100);
+    t.delegate.online = false;
+    await ShopKit.inventory.buy('a2', 100);
+    t.delegate.goOnline();
+    await TestShopKit.settle();
+    expect(t.delegate.phone, isEmpty);
+  });
 }

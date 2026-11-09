@@ -36,6 +36,20 @@ class TestShopKit {
   /// The wallet as the phone shows it.
   Map<String, dynamic> get local => delegate.local ?? {};
 
+  /// The app closed and opened again on the same phone (its delegate, its clock), signed in.
+  Future<void> reopen() async {
+    delegate.closeApp();
+    ShopKit.reset();
+    ShopKit.setup(
+      walletDelegate: delegate,
+      now: () => clock.now,
+      catalogDelegate: FakeCatalogDelegate(testCatalog),
+      writeWait: const Duration(milliseconds: 50),
+    );
+    ShopKit.start(uid);
+    await settle();
+  }
+
   /// Lets the streams and the queue run.
   static Future<void> settle() => Future<void>.delayed(Duration.zero);
 }

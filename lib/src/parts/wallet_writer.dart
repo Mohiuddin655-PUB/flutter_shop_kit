@@ -19,7 +19,8 @@ class WalletWriter {
   final Duration wait;
 
   /// [change], with ledger [entry] in the same batch when given.
-  Future<SpendResult> write(String uid, Map<String, Object?> change, {LedgerWrite? entry, VoidCallback? onRefused}) async {
+  /// [onSaved] when a write left pending reaches the server.
+  Future<SpendResult> write(String uid, Map<String, Object?> change, {LedgerWrite? entry, VoidCallback? onRefused, VoidCallback? onSaved}) async {
     final write = _delegate.update(uid, change, entry: entry);
     if (_delegate.online) {
       try {
@@ -33,7 +34,7 @@ class WalletWriter {
     }
     unawaited(
       write.then(
-        (_) {},
+        (_) => onSaved?.call(),
         onError: (Object error, StackTrace stack) {
           _fault('write queued', error, stack);
           onRefused?.call();

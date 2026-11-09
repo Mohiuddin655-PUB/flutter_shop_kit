@@ -9,6 +9,7 @@ import '../delegates/wallet_delegate.dart';
 import '../enums/spend_result.dart';
 import '../models/refund.dart';
 import '../models/refused_spend.dart';
+import 'pending_spends.dart';
 import 'wallet_doc.dart';
 import 'wallet_writer.dart';
 
@@ -18,6 +19,8 @@ class Wallet extends ChangeNotifier {
   Wallet(this._doc, this._writer, this._delegate) {
     _doc.addListener(_docChanged);
   }
+
+  late final _pending = PendingSpends(_delegate, refused);
 
   final WalletDoc _doc;
   final WalletWriter _writer;
@@ -85,13 +88,25 @@ class Wallet extends ChangeNotifier {
       LedgerKeys.source: LedgerKeys.app,
     };
     final named = LastWriteKeys.of(reason, ref, entry: id);
-    return _writer.write(
+    // Kept on the phone until answered, so a refusal after the app was closed is still told ([checkPending]).
+    await _pending.add(uid, (id: id, reason: reason, ref: ref, price: price));
+    final result = await _writer.write(
       uid,
       {...change, ...named, WalletKeys.pointsAmount: _delegate.increment(-price)},
       entry: (id: id, data: entry),
-      onRefused: () => refused(reason, ref, price),
+      onRefused: () {
+        refused(reason, ref, price);
+        _pending.remove(uid, id);
+      },
+      onSaved: () => _pending.remove(uid, id),
     );
+    if (result != SpendResult.pending) await _pending.remove(uid, id);
+    return result;
   }
+
+  /// The account [uid] was signed in: the spends a closed app left on their way are checked once the queue reaches the
+  /// server, and each refused is told.
+  Future<void> checkPending(String uid) => _pending.check(uid);
 
   /// A spend of [price] for [reason] of [ref] (or a use, at 0) the server refused after it showed: kept for the screen.
   void refused(String reason, String ref, int price) {

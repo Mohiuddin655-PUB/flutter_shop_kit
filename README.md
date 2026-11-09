@@ -18,7 +18,8 @@ await ShopKit.bundles.buy('starter', ShopKit.catalog.bundle('starter')!);
 - **One entry point**: `ShopKit.setup`, `ShopKit.start`, `ShopKit.clear`, and its parts `wallet`, `inventory`, `passes`,
   `bundles`, `catalog`. Each part is a `Listenable` that tells only when its own part changes.
 - **Offline buying**: a buy shows at once, waits in the backend's queue while offline, goes through once back online,
-  and is undone by itself if the server refuses it (kept in `ShopKit.wallet.refusals` for the screen to say so, each once: `seen`).
+  and is undone by itself if the server refuses it (kept in `ShopKit.wallet.refusals` for the screen to say so, each once: `seen`),
+  even when the app was closed in between: the next start checks the spends it left on their way.
 - **Six pass types**: duration (can stack), counter (with a most-held `max`), lifetime, daily, limited, until a date.
 - **Bundles**: items and up to 3 passes in one spend.
 - **Catalog from the server**: prices, timed sales, buying limits (`count` in each `minutes`, or for good), new items
@@ -184,6 +185,20 @@ class FirestoreWalletDelegate implements WalletDelegate {
   }
   @override
   String newEntryId(String uid) => _doc(uid).collection('ledger').doc().id;
+  @override
+  Future<String?> loadLocal(String uid) async => prefs.getString('shop_kit_pending_$uid');
+  @override
+  Future<void> saveLocal(String uid, String? text) => text == null ? prefs.remove('shop_kit_pending_$uid') : prefs.setString('shop_kit_pending_$uid', text);
+  @override
+  Future<void> settled() => _db.waitForPendingWrites();
+  @override
+  Future<bool?> entryOnServer(String uid, String id) async {
+    try {
+      return (await _doc(uid).collection('ledger').doc(id).get(const GetOptions(source: Source.server))).exists;
+    } catch (_) {
+      return null;
+    }
+  }
   @override
   Future<List<({String id, Map<String, dynamic> data})>> ledger(String uid, {String? afterId, required int limit}) async {
     var query = _doc(uid).collection('ledger').orderBy('at', descending: true).limit(limit);

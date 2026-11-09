@@ -92,6 +92,34 @@ class FakeWalletDelegate implements WalletDelegate {
     }
   }
 
+  /// What the kit keeps on the phone, by account.
+  final phone = <String, String>{};
+
+  @override
+  Future<String?> loadLocal(String uid) async => phone[uid];
+
+  @override
+  Future<void> saveLocal(String uid, String? text) async => text == null ? phone.remove(uid) : phone[uid] = text;
+
+  @override
+  Future<void> settled() async {
+    while (_queue.isNotEmpty || !online || holding) {
+      await Future<void>.delayed(const Duration(milliseconds: 2));
+    }
+  }
+
+  @override
+  Future<bool?> entryOnServer(String uid, String id) async => ledgerOnServer.containsKey(id);
+
+  /// The app was closed: what it waited on is gone, while the queue stays (as Firestore keeps it on the phone).
+  void closeApp() {
+    for (var i = 0; i < _queue.length; i++) {
+      final (change, entry, _) = _queue[i];
+      final orphan = Completer<void>()..future.ignore();
+      _queue[i] = (change, entry, orphan);
+    }
+  }
+
   @override
   String newEntryId(String uid) => 'e${++_ids}';
 

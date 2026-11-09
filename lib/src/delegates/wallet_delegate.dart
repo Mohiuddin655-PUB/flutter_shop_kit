@@ -21,6 +21,19 @@ abstract interface class WalletDelegate {
   /// id and stored fields.
   Future<List<({String id, Map<String, dynamic> data})>> ledger(String uid, {String? afterId, required int limit});
 
+  /// The text the kit keeps on the phone for [uid] (its spends still on their way to the server); null when none.
+  Future<String?> loadLocal(String uid);
+
+  /// Keeps [text] on the phone for [uid]; null takes it away.
+  Future<void> saveLocal(String uid, String? text);
+
+  /// Completes once every write made on this phone has reached the server (waiting while offline).
+  Future<void> settled();
+
+  /// Ledger entry [id] of [uid]'s is on the server, read from the server (not the phone's copy); null when it couldn't
+  /// be read.
+  Future<bool?> entryOnServer(String uid, String id);
+
   /// [by] added by the server, as a field's value.
   Object increment(int by);
 

@@ -1,3 +1,5 @@
+import 'dart:async' show unawaited;
+
 import 'package:flutter/foundation.dart' show visibleForTesting;
 
 import 'delegates/catalog_delegate.dart';
@@ -50,7 +52,11 @@ abstract final class ShopKit {
   static String get uid => _p.doc.uid;
 
   /// [uid] is signed in (a login, or a launch still signed in).
-  static void start(String uid) => _p.doc.start(uid);
+  static void start(String uid) {
+    if (uid.isEmpty || uid == _p.doc.uid) return;
+    _p.doc.start(uid);
+    unawaited(_p.wallet.checkPending(uid));
+  }
 
   /// Signed out: nothing of the account stays.
   static Future<void> clear() {

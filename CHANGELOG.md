@@ -1,3 +1,10 @@
+## 0.7.0
+
+- **Refusals after the app was closed**: a spend left on its way is kept on the phone (`WalletDelegate.loadLocal` /
+  `saveLocal`) until answered; at the next `ShopKit.start`, once the phone's queue has reached the server
+  (`settled`), a spend whose ledger entry isn't there (`entryOnServer`) is told in `ShopKit.wallet.refusals`.
+- **Breaking**: `WalletDelegate` gives `loadLocal`, `saveLocal`, `settled` and `entryOnServer`.
+
 ## 0.6.0
 
 - **Refunds told once**: a server taking currency back for a refund writes `lastRefund` (`{ref, amount, at}`) on the
