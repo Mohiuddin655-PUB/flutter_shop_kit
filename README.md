@@ -5,6 +5,15 @@ of six kinds, and **bundles**, all bought **offline too**, priced from a remote 
 It holds no backend of its own: your app gives it one through a small delegate, and a Firestore security rules template
 keeps every buy honest on the server.
 
+<p>
+  <img src="https://raw.githubusercontent.com/Mohiuddin655-PUB/flutter_shop_kit/main/doc/images/items.png" width="200" alt="Items with a sale and one owned">
+  <img src="https://raw.githubusercontent.com/Mohiuddin655-PUB/flutter_shop_kit/main/doc/images/passes_offline.png" width="200" alt="Passes bought offline">
+  <img src="https://raw.githubusercontent.com/Mohiuddin655-PUB/flutter_shop_kit/main/doc/images/bundles.png" width="200" alt="A bundle">
+  <img src="https://raw.githubusercontent.com/Mohiuddin655-PUB/flutter_shop_kit/main/doc/images/history.png" width="200" alt="The ledger as a history">
+</p>
+
+<sub>The <code>example/</code> app: items with a sale, passes bought offline, a bundle, and the history.</sub>
+
 ```dart
 ShopKit.wallet.amount                     // 1350
 ShopKit.inventory.owns('hat')             // true
@@ -63,32 +72,8 @@ Items (`inventory.buy`) and bundles (`bundles.buy`) flow the same way; a pass's 
 
 ## Architecture
 
-```
-┌──────────────────────────── your app ───────────────────────────────┐
-│  Shop page, Profile, …  ──listen──►  ShopKit.wallet                 │
-│                                      ShopKit.inventory              │
-│                                      ShopKit.passes                 │
-│                                      ShopKit.bundles                │
-│                                      ShopKit.catalog                │
-└─────────────────────────────────┬───────────────────────────────────┘
-                                  │ static API
-┌──────────────────────────── flutter_shop_kit ───────────────────────┐
-│  ShopKit ── Wallet · Inventory · Passes · Bundles                   │
-│                │ read their own fields from                         │
-│                ▼                                                    │
-│             WalletDoc (one listener)      WalletWriter              │
-│                                           (pending / refused)       │
-│  Catalog ◄── CatalogDelegate              now() (server time)       │
-└──────┬─────────────────────┬─────────────────────┬──────────────────┘
-       │ WalletDelegate      │ CatalogDelegate     │ now()
-┌──────▼─────────────────────▼─────────────────────▼──────────────────┐
-│  wallet document         catalog + its cache    server time         │
-│  (your delegate)         (your delegate)        (your function)     │
-│                                                                     │
-│  Firestore rules (rules/firestore.rules) check every write          │
-│  Your server (Admin SDK) is the only one adding currency            │
-└─────────────────────────────────────────────────────────────────────┘
-```
+![How flutter_shop_kit fits together](https://raw.githubusercontent.com/Mohiuddin655-PUB/flutter_shop_kit/main/doc/images/architecture.png)
+
 
 | What the app gives | What it does | Firestore example |
 |---|---|---|
@@ -186,9 +171,10 @@ class FirestoreWalletDelegate implements WalletDelegate {
   @override
   String newEntryId(String uid) => _doc(uid).collection('ledger').doc().id;
   @override
-  Future<String?> loadLocal(String uid) async => prefs.getString('shop_kit_pending_$uid');
+  Future<String?> loadLocal(String uid, String name) async => prefs.getString('shop_kit_${name}_$uid');
   @override
-  Future<void> saveLocal(String uid, String? text) => text == null ? prefs.remove('shop_kit_pending_$uid') : prefs.setString('shop_kit_pending_$uid', text);
+  Future<void> saveLocal(String uid, String name, String? text) =>
+      text == null ? prefs.remove('shop_kit_${name}_$uid') : prefs.setString('shop_kit_${name}_$uid', text);
   @override
   Future<void> settled() => _db.waitForPendingWrites();
   @override
@@ -249,8 +235,51 @@ await ShopKit.clear();
 
 ### 4. Copy the security rules
 
-Copy `rules/firestore.rules` into your rules and change the two paths marked `CHANGE`. Only your server (Admin SDK)
-adds currency, for example from a store purchase webhook.
+Copy `rules/firestore.rules` into your rules and change the paths marked `CHANGE`.
+
+### 5. Give currency from your server
+
+Call `grantPack` and `refundPack` from your store webhook: see [Server side](#server-side-packs-and-refunds).
+
+## Offline, and after the app was closed
+
+![How flutter_shop_kit caches](https://raw.githubusercontent.com/Mohiuddin655-PUB/flutter_shop_kit/main/doc/images/caching.png)
+
+The screen always reads the kit (`ShopKit.wallet`, `.inventory`, `.passes`…). What it shows when the app opens offline:
+
+| What | Where it comes from | With Firestore | With your own backend |
+|---|---|---|---|
+| Balance, items, passes, a refund | The wallet last heard, kept on the phone by the kit (`loadLocal`/`saveLocal`, `wallet`) until the backend answers | ✅ | ✅ |
+| Prices, sales, passes, bundles | `CatalogDelegate.cached()` | ✅ (your copy) | ✅ when you keep a copy |
+| A buy made offline, shown at once | Your `WalletDelegate`: `watch` shows it, `update` queues it | ✅ Firestore does it | Your delegate keeps a queue |
+| A buy refused after the app was closed | The kit's list of spends on their way (`pending`), checked at the next start | ✅ | ✅ |
+| The history | `WalletDelegate.ledger()` | ✅ pages seen before | As your delegate keeps them |
+| The time | `now()` | The server's offset you give | The server's offset you give |
+
+So with any backend the screen shows the last known balance and what is owned at once, offline too; buying offline
+also needs the delegate to show and queue its writes, as Firestore does.
+
+## Server side: packs and refunds
+
+Only your server adds currency or takes it back; the app can't (the rules refuse it). Call these from your store's
+webhook (RevenueCat, App Store Server Notifications or Google Play's real-time notifications). A ready example for
+Cloud Functions with the Admin SDK is in [`server/firebase_functions.ts`](server/firebase_functions.ts).
+
+**A pack bought** (`grantPack(uid, transaction, points, product)`), in one transaction:
+
+1. Stop if `accounts/{uid}/purchases/points_{transaction}` exists (a webhook is retried; a pack counts once), else create it.
+2. On the wallet: `points.amount` up by the pack (`increment`), `points.last_purchase_at` (server time) and
+   `points.last_purchase_amount`, so the app can say "you've got N" (`ShopKit.wallet.purchaseAfter`).
+3. In the ledger: `ledger/points_{transaction}`, a `credit` of `packBought` for the transaction, `source: server`.
+
+**A pack refunded** (`refundPack(uid, transaction)`), in one transaction:
+
+1. Stop if the purchase is unknown or already has `refundedAt`; else mark it.
+2. On the wallet: `points.amount` down by **all** the pack gave, even below zero: what was spent becomes a debt
+   (`ShopKit.wallet.debt`), and nothing can be bought (`SpendResult.inDebt`) until a pack pays it back.
+3. `lastRefund: {ref, amount, at}` on the wallet, so the app can tell it once (`ShopKit.wallet.refund`, then
+   `seenRefund()`, which the rules let the app write).
+4. In the ledger: `ledger/refund_{transaction}`, a `debit` of `refund`, `source: server`.
 
 ## Example shop UIs
 

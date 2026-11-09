@@ -19,6 +19,7 @@ analyzer:
     - "**/*.g.dart"
     - "**/*.freezed.dart"
     - build/**
+    - android/**
 include: package:flutter_lints/flutter.yaml
 
 linter:

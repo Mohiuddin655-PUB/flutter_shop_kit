@@ -1,3 +1,15 @@
+## 0.8.0
+
+- **The wallet last heard is kept on the phone** and shown at the next start before the backend answers, offline
+  too, whatever the backend: the balance, items, passes and a refund never show empty. Dates keep their backend's type.
+  `ShopKit.clear()` (sign-out) wipes it; the spends still on their way stay, so a refusal is still told.
+- **Breaking**: `WalletDelegate.loadLocal` and `saveLocal` take a `name` (`wallet`, `pending`) for what is kept.
+- The README says where each thing on screen comes from, offline and after the app was closed.
+- **Server side** in the README: what a pack bought and a refund write, and `server/firebase_functions.ts`, a ready
+  Cloud Functions example (`grantPack`, `refundPack`) with the Admin SDK.
+- The architecture as a picture, screenshots of the example (and on pub.dev), and a fuller example app: items with a
+  sale, passes, a bundle and the history, in tabs, with an offline switch.
+
 ## 0.7.0
 
 - **Refusals after the app was closed**: a spend left on its way is kept on the phone (`WalletDelegate.loadLocal` /

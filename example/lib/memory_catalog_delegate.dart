@@ -7,6 +7,8 @@ class MemoryCatalogDelegate implements CatalogDelegate {
   Map<String, Object?>? cached() => {
     CatalogKeys.items: {
       'hat': {CatalogKeys.price: 100},
+      'crown': {CatalogKeys.price: 400},
+      'shades': {CatalogKeys.price: 150},
       'cape': {
         CatalogKeys.price: 300,
         CatalogKeys.sale: {CatalogKeys.price: 200, CatalogKeys.until: DateTime.now().add(const Duration(days: 1)).millisecondsSinceEpoch},

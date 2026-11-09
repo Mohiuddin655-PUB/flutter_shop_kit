@@ -1,9 +1,10 @@
-import 'dart:async' show StreamSubscription, Timer;
+import 'dart:async' show StreamSubscription, Timer, unawaited;
 
 import 'package:flutter/foundation.dart';
 
 import '../delegates/error_reporter.dart';
 import '../delegates/wallet_delegate.dart';
+import '../utils/wallet_copy.dart';
 
 /// The signed-in account's wallet document, heard once for [ShopKit]: its parts read their own fields from here. The
 /// delegate's copy at once (its own writes included), then the server's, and each change.
@@ -27,18 +28,34 @@ class WalletDoc extends ChangeNotifier {
   void start(String uid) {
     if (uid.isEmpty || uid == _uid) return;
     _uid = uid;
+    _heard = false;
     _set(null);
     _retryAfter = _firstRetry;
     _listen();
+    unawaited(_showKept(uid));
   }
 
-  /// Signed out: nothing of the account stays.
+  static const _copy = 'wallet';
+
+  /// The backend has answered since the start, so the phone's copy no longer shows.
+  bool _heard = false;
+
+  /// The wallet last heard, kept on the phone, shown until the backend answers (offline, or slow), whatever it is.
+  Future<void> _showKept(String uid) async {
+    final kept = WalletCopy.decode(await _delegate.loadLocal(uid, _copy), _delegate);
+    if (kept != null && !_heard && uid == _uid) _set(kept);
+  }
+
+  /// Signed out: nothing of the account stays, on screen or on the phone (its wallet's copy is wiped; its spends still
+  /// on their way stay, so a refusal is still told when it signs in again).
   Future<void> clear() async {
+    final uid = _uid;
     _retry?.cancel();
     await _watch?.cancel();
     _watch = null;
     _uid = '';
     _set(null);
+    if (uid.isNotEmpty) await _delegate.saveLocal(uid, _copy, null).catchError((Object _) {});
   }
 
   Timer? _retry;
@@ -57,7 +74,9 @@ class WalletDoc extends ChangeNotifier {
         .listen(
           (data) {
             _retryAfter = _firstRetry;
+            _heard = true;
             _set(data);
+            unawaited(_delegate.saveLocal(uid, _copy, data == null ? null : WalletCopy.encode(data, _delegate)).catchError((Object _) {}));
           },
           onError: (Object error, StackTrace stack) {
             _report?.call(error, stack, 'wallet');

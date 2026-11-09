@@ -12,6 +12,8 @@ class PendingSpends {
   PendingSpends(this._delegate, this._refused);
 
   final WalletDelegate _delegate;
+
+  static const _name = 'pending';
   final void Function(String reason, String ref, int price) _refused;
 
   /// One change of the phone's copy at a time.
@@ -25,7 +27,7 @@ class PendingSpends {
 
   Future<List<PendingSpend>> _load(String uid) async {
     try {
-      final text = await _delegate.loadLocal(uid), list = text == null ? null : jsonDecode(text);
+      final text = await _delegate.loadLocal(uid, _name), list = text == null ? null : jsonDecode(text);
       return [
         if (list is List)
           for (final e in list)
@@ -39,6 +41,7 @@ class PendingSpends {
 
   Future<void> _save(String uid, List<PendingSpend> list) => _delegate.saveLocal(
     uid,
+    _name,
     list.isEmpty
         ? null
         : jsonEncode([

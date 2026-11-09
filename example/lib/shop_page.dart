@@ -2,106 +2,81 @@ import 'package:flutter/material.dart';
 import 'package:flutter_shop_kit/flutter_shop_kit.dart';
 
 import 'memory_wallet_delegate.dart';
+import 'tabs/bundles_tab.dart';
+import 'tabs/history_tab.dart';
+import 'tabs/items_tab.dart';
+import 'tabs/passes_tab.dart';
 
-/// The shop: the balance, the items, the passes and a bundle, each rebuilt only when its own part changes, with a
-/// switch to go offline and see buys wait for the link.
-class ShopPage extends StatelessWidget {
+/// The shop: the balance and an offline switch on top, then items, passes, bundles and the history in tabs. Each part
+/// rebuilds only when its own part of the kit changes.
+class ShopPage extends StatefulWidget {
   const ShopPage({super.key, required this.wallet});
 
   final MemoryWalletDelegate wallet;
 
-  Future<void> _say(BuildContext context, Future<SpendResult> buy) async {
-    final result = await buy;
-    if (!context.mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(_words(result))));
-  }
+  @override
+  State<ShopPage> createState() => _ShopPageState();
+}
 
-  static String _words(SpendResult r) => switch (r) {
-    SpendResult.done => 'Bought',
-    SpendResult.pending => 'Bought: it goes through once back online',
-    SpendResult.notEnough => 'Not enough coins',
-    SpendResult.inDebt => 'Buy coins to pay back what you owe first',
-    SpendResult.overLimit => 'You have it, or its limit is reached',
-    SpendResult.offline => "Couldn't reach the server",
-    SpendResult.failed => "Couldn't buy it",
-  };
-
+class _ShopPageState extends State<ShopPage> {
   @override
   Widget build(BuildContext context) {
-    final now = DateTime.now().toUtc();
-    return Scaffold(
-      appBar: AppBar(
-        title: ListenableBuilder(listenable: ShopKit.wallet, builder: (_, _) => Text('${ShopKit.wallet.amount} coins')),
-        actions: [
-          StatefulBuilder(
-            builder: (context, set) => Switch(value: wallet.online, onChanged: (on) => set(() => wallet.online = on)),
-          ),
-        ],
-      ),
-      body: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          const _Title('Items'),
-          ListenableBuilder(
-            listenable: Listenable.merge([ShopKit.inventory, ShopKit.catalog]),
-            builder: (context, _) => Column(
-              children: [
-                for (final id in ['hat', 'cape'])
-                  if (ShopKit.catalog.offer(id) case final offer?)
-                    ListTile(
-                      title: Text(id),
-                      subtitle: Text(offer.onSale(now) ? 'Sale: ${offer.priceAt(now)} (was ${offer.price})' : '${offer.price}'),
-                      trailing: ShopKit.inventory.owns(id)
-                          ? const Icon(Icons.check)
-                          : FilledButton(onPressed: () => _say(context, ShopKit.inventory.buy(id, offer.priceAt(now))), child: const Text('Buy')),
-                    ),
-              ],
-            ),
-          ),
-          const _Title('Passes'),
-          ListenableBuilder(
-            listenable: ShopKit.passes,
-            builder: (context, _) => Column(
-              children: [
-                for (final id in ShopKit.catalog.passIds)
-                  if (ShopKit.catalog.pass(id) case final terms?)
-                    ListTile(
-                      title: Text('$id (${terms.type.name})'),
-                      subtitle: Text(ShopKit.passes.on(id) ? 'On · ${ShopKit.passes.left(id)} uses left' : '${terms.price}'),
-                      trailing: Wrap(
-                        spacing: 8,
-                        children: [
-                          if (ShopKit.passes.left(id) > 0) OutlinedButton(onPressed: () => ShopKit.passes.use(id), child: const Text('Use')),
-                          FilledButton(onPressed: () => _say(context, ShopKit.passes.buy(id, terms)), child: const Text('Buy')),
-                        ],
-                      ),
-                    ),
-              ],
-            ),
-          ),
-          const _Title('Bundle'),
-          if (ShopKit.catalog.bundle('starter') case final terms?)
-            Card(
-              child: ListTile(
-                title: const Text('Starter: a hat, a boost and 5 hints'),
-                subtitle: Text('${terms.price} · once'),
-                trailing: FilledButton(onPressed: () => _say(context, ShopKit.bundles.buy('starter', terms)), child: const Text('Buy')),
+    final scheme = Theme.of(context).colorScheme;
+    return DefaultTabController(
+      length: 4,
+      child: Scaffold(
+        appBar: AppBar(
+          title: const Text('Shop', style: TextStyle(fontWeight: FontWeight.w800)),
+          actions: [
+            ListenableBuilder(
+              listenable: ShopKit.wallet,
+              builder: (_, _) => Chip(
+                avatar: Icon(Icons.toll_rounded, color: scheme.primary),
+                label: Text('${ShopKit.wallet.amount}', style: const TextStyle(fontWeight: FontWeight.w700)),
               ),
             ),
-        ],
+            const SizedBox(width: 4),
+            Tooltip(
+              message: widget.wallet.online ? 'Online' : 'Offline',
+              child: Switch(value: widget.wallet.online, onChanged: (on) => setState(() => widget.wallet.online = on)),
+            ),
+          ],
+          bottom: const TabBar(
+            tabs: [
+              Tab(text: 'Items'),
+              Tab(text: 'Passes'),
+              Tab(text: 'Bundles'),
+              Tab(text: 'History'),
+            ],
+          ),
+        ),
+        body: Column(
+          children: [
+            if (!widget.wallet.online)
+              MaterialBanner(
+                leading: const Icon(Icons.cloud_off_rounded),
+                content: const Text('Offline: buys show at once and go through when you are back.'),
+                actions: [TextButton(onPressed: () => setState(() => widget.wallet.online = true), child: const Text('Go online'))],
+              ),
+            const Expanded(child: TabBarView(children: [ItemsTab(), PassesTab(), BundlesTab(), HistoryTab()])),
+          ],
+        ),
       ),
     );
   }
 }
 
-class _Title extends StatelessWidget {
-  const _Title(this.text);
-
-  final String text;
-
-  @override
-  Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.only(top: 16, bottom: 4),
-    child: Text(text, style: Theme.of(context).textTheme.titleMedium),
-  );
+/// Says how a buy went, in a snack bar.
+Future<void> tell(BuildContext context, Future<SpendResult> buy) async {
+  final result = await buy;
+  if (!context.mounted) return;
+  final text = switch (result) {
+    SpendResult.done => 'Bought',
+    SpendResult.pending => 'Bought: it goes through once you are back online',
+    SpendResult.notEnough => 'Not enough coins',
+    SpendResult.inDebt => 'Buy coins to pay back what you owe first',
+    SpendResult.overLimit => 'You have it already, or its limit is reached',
+    SpendResult.offline || SpendResult.failed => "Couldn't buy it",
+  };
+  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text), behavior: SnackBarBehavior.floating));
 }

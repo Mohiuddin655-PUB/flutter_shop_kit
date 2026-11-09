@@ -20,6 +20,8 @@ void main() {
   runApp(
     MaterialApp(
       title: 'ShopKit example',
+      debugShowCheckedModeBanner: false,
+      theme: ThemeData(colorSchemeSeed: const Color(0xFFFF7A3D), useMaterial3: true),
       home: ShopPage(wallet: wallet),
     ),
   );

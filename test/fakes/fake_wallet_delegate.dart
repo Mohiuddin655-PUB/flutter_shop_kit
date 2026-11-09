@@ -43,7 +43,7 @@ class FakeWalletDelegate implements WalletDelegate {
   @override
   Stream<Map<String, dynamic>?> watch(String uid) {
     late final StreamController<Map<String, dynamic>?> c;
-    c = StreamController<Map<String, dynamic>?>(onListen: () => c.add(local), onCancel: () => _watchers.remove(c));
+    c = StreamController<Map<String, dynamic>?>(onListen: () => silent ? null : c.add(local), onCancel: () => _watchers.remove(c));
     _watchers.add(c);
     return c.stream;
   }
@@ -86,6 +86,7 @@ class FakeWalletDelegate implements WalletDelegate {
   }
 
   void _tell() {
+    if (silent) return;
     final doc = local;
     for (final c in [..._watchers]) {
       c.add(doc);
@@ -96,10 +97,13 @@ class FakeWalletDelegate implements WalletDelegate {
   final phone = <String, String>{};
 
   @override
-  Future<String?> loadLocal(String uid) async => phone[uid];
+  Future<String?> loadLocal(String uid, String name) async => phone['$uid/$name'];
 
   @override
-  Future<void> saveLocal(String uid, String? text) async => text == null ? phone.remove(uid) : phone[uid] = text;
+  Future<void> saveLocal(String uid, String name, String? text) async => text == null ? phone.remove('$uid/$name') : phone['$uid/$name'] = text;
+
+  /// The backend answers nothing (as when it is offline and keeps no copy of its own).
+  bool silent = false;
 
   @override
   Future<void> settled() async {

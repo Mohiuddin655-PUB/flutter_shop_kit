@@ -91,7 +91,7 @@ void main() {
       await Future<void>.delayed(const Duration(milliseconds: 5));
     }
     expect([for (final r in ShopKit.wallet.refusals) (r.ref, r.price)], [('a1', 100)]);
-    expect(t.delegate.phone, isEmpty);
+    expect(t.delegate.phone['u1/pending'], isNull);
   });
 
   test('a spend taken after the app was closed is not told', () async {
@@ -105,7 +105,7 @@ void main() {
     }
     expect(ShopKit.wallet.refusals, isEmpty);
     expect(ShopKit.inventory.owns('a1'), isTrue);
-    expect(t.delegate.phone, isEmpty);
+    expect(t.delegate.phone['u1/pending'], isNull);
   });
 
   test('a spend answered while the app is open leaves nothing on the phone', () async {
@@ -115,6 +115,48 @@ void main() {
     await ShopKit.inventory.buy('a2', 100);
     t.delegate.goOnline();
     await TestShopKit.settle();
-    expect(t.delegate.phone, isEmpty);
+    expect(t.delegate.phone['u1/pending'], isNull);
+  });
+
+  test('reopened offline, the wallet last heard shows before the backend answers', () async {
+    final t = await TestShopKit.make(
+      more: {
+        WalletKeys.items: ['a1'],
+        WalletKeys.passes: {
+          'vip': {WalletKeys.owned: true},
+        },
+      },
+    );
+    t.delegate.silent = true;
+    await t.reopen();
+    await TestShopKit.settle();
+    expect(ShopKit.wallet.amount, 1000);
+    expect(ShopKit.inventory.owns('a1'), isTrue);
+    expect(ShopKit.passes.on('vip'), isTrue);
+  });
+
+  test('the copy keeps dates as the backend gives them', () async {
+    final t = await TestShopKit.make(
+      more: {
+        WalletKeys.passes: {
+          'filters': {WalletKeys.from: DateTime.utc(2026, 11, 9, 11, 30), WalletKeys.minutes: 60},
+        },
+      },
+    );
+    t.delegate.silent = true;
+    await t.reopen();
+    await TestShopKit.settle();
+    expect(ShopKit.passes.on('filters'), isTrue);
+  });
+
+  test('sign-out wipes the wallet copy and keeps the spends on their way', () async {
+    final t = await TestShopKit.make();
+    t.delegate.online = false;
+    await ShopKit.inventory.buy('a1', 100);
+    await TestShopKit.settle();
+    expect(t.delegate.phone['u1/wallet'], isNotNull);
+    await ShopKit.clear();
+    expect(t.delegate.phone['u1/wallet'], isNull);
+    expect(t.delegate.phone['u1/pending'], isNotNull);
   });
 }

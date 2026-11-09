@@ -21,11 +21,12 @@ abstract interface class WalletDelegate {
   /// id and stored fields.
   Future<List<({String id, Map<String, dynamic> data})>> ledger(String uid, {String? afterId, required int limit});
 
-  /// The text the kit keeps on the phone for [uid] (its spends still on their way to the server); null when none.
-  Future<String?> loadLocal(String uid);
+  /// The text the kit keeps on the phone as [name] for [uid] (`wallet`: the wallet last heard, shown at the next start
+  /// before the backend answers, offline too; `pending`: its spends still on their way to the server); null when none.
+  Future<String?> loadLocal(String uid, String name);
 
-  /// Keeps [text] on the phone for [uid]; null takes it away.
-  Future<void> saveLocal(String uid, String? text);
+  /// Keeps [text] on the phone as [name] for [uid]; null takes it away.
+  Future<void> saveLocal(String uid, String name, String? text);
 
   /// Completes once every write made on this phone has reached the server (waiting while offline).
   Future<void> settled();

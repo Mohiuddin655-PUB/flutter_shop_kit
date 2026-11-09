@@ -62,10 +62,10 @@ class MemoryWalletDelegate implements WalletDelegate {
   final _phone = <String, String>{};
 
   @override
-  Future<String?> loadLocal(String uid) async => _phone[uid];
+  Future<String?> loadLocal(String uid, String name) async => _phone['$uid/$name'];
 
   @override
-  Future<void> saveLocal(String uid, String? text) async => text == null ? _phone.remove(uid) : _phone[uid] = text;
+  Future<void> saveLocal(String uid, String name, String? text) async => text == null ? _phone.remove('$uid/$name') : _phone['$uid/$name'] = text;
 
   @override
   Future<void> settled() async {
