@@ -1,6 +1,6 @@
 name: flutter_shop_kit
 description: "An in-app shop for virtual currency: balance, owned items, six kinds of passes and bundles, bought offline too, priced from a remote catalog with sales and buying limits. Backend-agnostic, with Firestore rules."
-version: 0.5.0
+version: 0.6.0
 repository: https://github.com/Mohiuddin655-PUB/flutter_shop_kit
 issue_tracker: https://github.com/Mohiuddin655-PUB/flutter_shop_kit/issues
 topics: [shop, wallet, in-app-purchase, offline, firestore]

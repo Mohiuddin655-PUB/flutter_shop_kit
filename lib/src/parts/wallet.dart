@@ -7,6 +7,7 @@ import '../../keys/ledger_keys.dart';
 import '../../keys/wallet_keys.dart';
 import '../delegates/wallet_delegate.dart';
 import '../enums/spend_result.dart';
+import '../models/refund.dart';
 import '../models/refused_spend.dart';
 import 'wallet_doc.dart';
 import 'wallet_writer.dart';
@@ -24,6 +25,7 @@ class Wallet extends ChangeNotifier {
 
   int _amount = 0;
   List<RefusedSpend> _refusals = const [];
+  Refund? _refund;
   int? _lastPurchaseAmount;
   DateTime? _lastPurchaseAt;
 
@@ -35,6 +37,17 @@ class Wallet extends ChangeNotifier {
   /// The last pack bought with money: when (the server's time) and how much it gave.
   DateTime? get lastPurchaseAt => _lastPurchaseAt;
   int? get lastPurchaseAmount => _lastPurchaseAmount;
+
+  /// The last refund that took currency back, until it is told ([seenRefund]) on any of the account's phones; null
+  /// when there is none to tell.
+  Refund? get refund => _refund;
+
+  /// The last [refund] was told: marked on the server, offline too, so it isn't told again anywhere.
+  Future<void> seenRefund() async {
+    final refund = _refund, uid = _doc.uid;
+    if (refund == null || uid.isEmpty) return;
+    await _writer.write(uid, {WalletKeys.refundSeen: refund.ref});
+  }
 
   /// Spends (and passes' uses) taken on this phone, offline or answered late, that the server then refused, each undone
   /// by itself, oldest first: for the screen to say so, each once ([seen]).
@@ -106,11 +119,20 @@ class Wallet extends ChangeNotifier {
     int? whole(Object? v) => v is num ? v.toInt() : null;
     final amount = whole(map[WalletKeys.amount]) ?? 0, at = _delegate.timeOf(map[WalletKeys.lastPurchaseAt]);
     final last = whole(map[WalletKeys.lastPurchaseAmount]);
-    if (amount == _amount && at == _lastPurchaseAt && last == _lastPurchaseAmount) return;
+    final refund = _unseenRefund(_doc.data);
+    if (amount == _amount && at == _lastPurchaseAt && last == _lastPurchaseAmount && refund?.ref == _refund?.ref) return;
+    _refund = refund;
     _amount = amount;
     _lastPurchaseAt = at;
     _lastPurchaseAmount = last;
     notifyListeners();
+  }
+
+  Refund? _unseenRefund(Map<String, dynamic>? data) {
+    final last = data?[WalletKeys.lastRefund];
+    if (last is! Map || last[WalletKeys.ref] is! String || last[WalletKeys.ref] == data?[WalletKeys.refundSeen]) return null;
+    final amount = last[WalletKeys.amount];
+    return Refund(ref: last[WalletKeys.ref] as String, amount: amount is num ? amount.toInt() : 0, at: _delegate.timeOf(last[WalletKeys.at]));
   }
 
   @override

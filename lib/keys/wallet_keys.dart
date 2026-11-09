@@ -31,6 +31,13 @@ abstract final class WalletKeys {
   static const passBuys = 'passBuys';
   static const bundleBuys = 'bundleBuys';
 
+  /// The last refund, written by the server (`{ref, amount, at}`: the store transaction, the currency taken back, the
+  /// server's time), and the one the app has told (`refundSeen`: its `ref`).
+  static const lastRefund = 'lastRefund';
+  static const refundSeen = 'refundSeen';
+  static const ref = 'ref';
+  static const at = 'at';
+
   /// [key] of pass [id], as a field path for an update.
   static String pass(String id, String key) => '$passes.$id.$key';
 }

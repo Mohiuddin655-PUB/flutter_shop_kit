@@ -25,6 +25,8 @@ await ShopKit.bundles.buy('starter', ShopKit.catalog.bundle('starter')!);
   and passes without an app release.
 - **Ledger**: every spend recorded as a debit in the same batch (offline too); credits and refunds written by your
   server; read a page at a time for a history screen or support.
+- **Refunds told once**: a refund your server takes back writes `lastRefund` on the wallet; `ShopKit.wallet.refund`
+  gives it until `seenRefund()`, so the app says it once, on any phone.
 - **Refund debt**: a refund your server takes back in full can leave the balance below zero; `ShopKit.wallet.debt`
   says how much is owed, and nothing can be spent (`SpendResult.inDebt`) until bought currency pays it back.
 - **Server-checked**: a Firestore rules template checks every price, balance, pass, limit and ledger entry.

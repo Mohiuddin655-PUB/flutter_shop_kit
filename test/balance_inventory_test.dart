@@ -68,4 +68,34 @@ void main() {
     expect(ShopKit.wallet.amount, 0);
     expect(await ShopKit.inventory.buy('a1', 100), SpendResult.failed);
   });
+
+  test('a refund is told until seen, once, on any phone', () async {
+    final t = await TestShopKit.make(
+      points: -100,
+      more: {
+        WalletKeys.lastRefund: {WalletKeys.ref: 'GPA.1', WalletKeys.amount: 300, WalletKeys.at: DateTime.utc(2026, 11, 9)},
+      },
+    );
+    expect((ShopKit.wallet.refund?.ref, ShopKit.wallet.refund?.amount), ('GPA.1', 300));
+    await ShopKit.wallet.seenRefund();
+    await TestShopKit.settle();
+    expect(ShopKit.wallet.refund, isNull);
+    expect(t.delegate.server![WalletKeys.refundSeen], 'GPA.1');
+  });
+
+  test('a later refund is told again', () async {
+    final t = await TestShopKit.make(
+      more: {
+        WalletKeys.lastRefund: {WalletKeys.ref: 'GPA.1', WalletKeys.amount: 300},
+        WalletKeys.refundSeen: 'GPA.1',
+      },
+    );
+    expect(ShopKit.wallet.refund, isNull);
+    t.delegate.serverSets({
+      ...t.delegate.server!,
+      WalletKeys.lastRefund: {WalletKeys.ref: 'GPA.2', WalletKeys.amount: 100},
+    });
+    await TestShopKit.settle();
+    expect(ShopKit.wallet.refund?.ref, 'GPA.2');
+  });
 }

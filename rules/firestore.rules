@@ -50,6 +50,14 @@ service cloud.firestore {
         && spends(shopPrice(id)) && records(uid, 'itemBought', id, shopPrice(id));
     }
 
+    // ---- Refunds -----------------------------------------------------------------------------------------------------------
+    // The server writes the last refund (`lastRefund`: `{ref, amount, at}`); the app only marks it seen (`refundSeen`,
+    // its `ref`) and nothing else.
+    function seesRefund() {
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly(['refundSeen'])
+        && request.resource.data.refundSeen == resource.data.get('lastRefund', {}).get('ref', null);
+    }
+
     // ---- Ledger ------------------------------------------------------------------------------------------------------------
     // A spend names its new ledger entry (`lastWrite.entry`), created in the same batch (`accounts/{uid}/wallet/main/
     // ledger/{entry}`) as a debit of its price, for what it bought, at the server's time. Entries never change.
@@ -223,7 +231,7 @@ service cloud.firestore {
     // CHANGE: where each account's wallet lives (and `ledgerEntry` above, and the paths below).
     match /accounts/{uid}/wallet/main {
       allow read: if isOwner(uid);
-      allow update: if isOwner(uid) && (buysItem(uid) || buysPass(uid) || usesPass() || buysBundle(uid));
+      allow update: if isOwner(uid) && (buysItem(uid) || buysPass(uid) || usesPass() || buysBundle(uid) || seesRefund());
     }
     match /accounts/{uid}/wallet/main/ledger/{entryId} {
       allow read: if isOwner(uid);

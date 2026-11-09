@@ -1,3 +1,9 @@
+## 0.6.0
+
+- **Refunds told once**: a server taking currency back for a refund writes `lastRefund` (`{ref, amount, at}`) on the
+  wallet; `ShopKit.wallet.refund` gives it until `seenRefund()` marks it told (`refundSeen`, on the server, so it is told
+  once on any of the account's phones). The rules template lets the app write only that mark.
+
 ## 0.5.0
 
 - **Refusals**: a spend (or a pass's use) the server refused after it showed is kept in `ShopKit.wallet.refusals`
