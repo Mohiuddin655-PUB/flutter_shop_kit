@@ -2,6 +2,8 @@
 
 - **Breaking**: the delegates are named for what they hand over: `ShopBackend` is `WalletDelegate` and `CatalogSource`
   is `CatalogDelegate`; `ShopKit.setup` takes `walletDelegate:` and `catalogDelegate:`.
+- **Breaking**: `Clock` is gone: `ShopKit.setup` takes an optional `now` function for the server's time (the phone's
+  clock, UTC, when none is given).
 - The package's repository link points at `flutter_shop_kit`.
 
 ## 0.1.0

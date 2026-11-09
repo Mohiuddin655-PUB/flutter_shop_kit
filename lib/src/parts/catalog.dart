@@ -4,7 +4,6 @@ import 'package:flutter/widgets.dart' show AppLifecycleListener, ChangeNotifier;
 
 import '../../keys/catalog_keys.dart';
 import '../delegates/catalog_delegate.dart';
-import '../delegates/clock.dart';
 import '../models/bundle_terms.dart';
 import '../models/catalog_bundle.dart';
 import '../models/catalog_pass.dart';
@@ -16,7 +15,7 @@ import '../models/pass_terms.dart';
 /// sale runs, by the server's clock, as the rules charge. Before the first copy, every item is sold and the passes are
 /// the app's [fallbackPasses]. Told when the copy changes, and when a sale starts or ends.
 class Catalog extends ChangeNotifier {
-  Catalog(this._source, this._clock, {Map<String, Object?> fallbackPasses = const {}}) : _fallback = fallbackPasses {
+  Catalog(this._source, this._now, {Map<String, Object?> fallbackPasses = const {}}) : _fallback = fallbackPasses {
     _set(_source.cached());
     _source.versionChanges.addListener(ask);
     // A sleeping phone holds its timer back: back from the background, prices are worked out again and it is set anew.
@@ -26,7 +25,9 @@ class Catalog extends ChangeNotifier {
   }
 
   final CatalogDelegate _source;
-  final Clock _clock;
+
+  /// The server's time now.
+  final DateTime Function() _now;
   final Map<String, Object?> _fallback;
   late final AppLifecycleListener _resume;
 
@@ -52,13 +53,13 @@ class Catalog extends ChangeNotifier {
   Iterable<String> get passIds => _passes.keys;
 
   /// Pass [id]'s terms now (its sale's price while the sale runs); null when it isn't sold.
-  PassTerms? pass(String id) => _passes[id]?.termsAt(_clock.now);
+  PassTerms? pass(String id) => _passes[id]?.termsAt(_now());
 
   /// The bundles sold, by id.
   Iterable<String> get bundleIds => _bundles.keys;
 
   /// Bundle [id]'s terms now (its sale's price while the sale runs); null when it isn't sold.
-  BundleTerms? bundle(String id) => _bundles[id]?.termsAt(_clock.now);
+  BundleTerms? bundle(String id) => _bundles[id]?.termsAt(_now());
 
   /// Reads the server's catalog when its version differs from the copy's; a second caller waits for the first.
   Future<void> refresh() {
@@ -93,7 +94,7 @@ class Catalog extends ChangeNotifier {
 
   /// Told now, and again when a sale next starts or ends, so prices on screen follow it.
   void _schedule() {
-    final now = _clock.now;
+    final now = _now();
     final changes = [
       ...?_offers?.values,
       for (final pass in _passes.values) pass.offer,

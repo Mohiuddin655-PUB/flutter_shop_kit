@@ -70,23 +70,23 @@ Items (`inventory.buy`) and bundles (`bundles.buy`) flow the same way; a pass's 
 │                ▼                                                    │
 │             WalletDoc (one listener)      WalletWriter              │
 │                                           (pending / refused)       │
-│  Catalog ◄── CatalogDelegate              Clock                     │
+│  Catalog ◄── CatalogDelegate              now() (server time)       │
 └──────┬─────────────────────┬─────────────────────┬──────────────────┘
-       │ WalletDelegate      │ CatalogDelegate     │ Clock
+       │ WalletDelegate      │ CatalogDelegate     │ now()
 ┌──────▼─────────────────────▼─────────────────────▼──────────────────┐
 │  wallet document         catalog + its cache    server time         │
-│  (your delegate)         (your delegate)        (your delegate)     │
+│  (your delegate)         (your delegate)        (your function)     │
 │                                                                     │
 │  Firestore rules (rules/firestore.rules) check every write          │
 │  Your server (Admin SDK) is the only one adding currency            │
 └─────────────────────────────────────────────────────────────────────┘
 ```
 
-| Delegate | What it does | Firestore example |
+| What the app gives | What it does | Firestore example |
 |---|---|---|
 | `WalletDelegate` | Hears and writes the account's wallet; the server's increment, list union and time | the wallet document |
 | `CatalogDelegate` | The admin's catalog: the phone's copy, the server's at a version | `config/shop`, cached |
-| `Clock` | The server's time, so passes, sales and limits match the rules | a server-time offset |
+| `now` (a function, optional) | The server's time, so passes, sales and limits match the rules | a server-time offset |
 | `ErrorReporter` | Records unexpected errors (optional) | Crashlytics |
 
 `WalletDelegate` must show a write in `watch` at once and keep it in a queue while offline. Firestore does both by itself;
@@ -181,8 +181,9 @@ class FirestoreWalletDelegate implements WalletDelegate {
 }
 ```
 
-`CatalogDelegate` reads `config/shop` (converting `Timestamp`s to milliseconds) and keeps a copy on the phone; `Clock` gives
-the server's time (for example `DateTime.now()` plus an offset from your server).
+`CatalogDelegate` reads `config/shop` (converting `Timestamp`s to milliseconds) and keeps a copy on the phone; `now` gives
+the server's time (for example `DateTime.now()` plus an offset from your server). Without `now`, the phone's clock is
+used, which its owner can move, so a real shop gives the server's: the rules go by it.
 
 ### 3. Set it up once, start and clear with the account
 
@@ -192,7 +193,7 @@ void main() async {
   await Firebase.initializeApp();
   ShopKit.setup(
     walletDelegate: FirestoreWalletDelegate(),
-    clock: MyServerClock(),
+    now: () => myServerClock.now,
     catalogDelegate: MyCatalogDelegate(),
     onError: (e, s, where) => FirebaseCrashlytics.instance.recordError(e, s, reason: where),
   );
@@ -226,7 +227,7 @@ An item with its sale:
 ListenableBuilder(
   listenable: Listenable.merge([ShopKit.inventory, ShopKit.catalog]),
   builder: (context, _) {
-    final offer = ShopKit.catalog.offer('cape')!, now = myClock.now; // the Clock given to ShopKit.setup
+    final offer = ShopKit.catalog.offer('cape')!, now = myServerClock.now; // the time given to ShopKit.setup
     return ListTile(
       title: const Text('Cape'),
       subtitle: Text(offer.onSale(now) ? '${offer.priceAt(now)} (was ${offer.price})' : '${offer.price}'),

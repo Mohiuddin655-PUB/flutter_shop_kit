@@ -2,7 +2,6 @@ import 'package:flutter/foundation.dart';
 
 import '../../keys/last_write_keys.dart';
 import '../../keys/wallet_keys.dart';
-import '../delegates/clock.dart';
 import '../delegates/wallet_delegate.dart';
 import '../enums/pass_type.dart';
 import '../enums/spend_result.dart';
@@ -17,7 +16,7 @@ import 'wallet_writer.dart';
 /// The account's passes (`passes`, by id) of any [PassType]: whether one may be used, its uses left, buying and
 /// using one, offline too. Told only when the passes change.
 class Passes extends ChangeNotifier {
-  Passes(this._doc, this._balance, this._writer, this._delegate, this._clock) {
+  Passes(this._doc, this._balance, this._writer, this._delegate, this._now) {
     _doc.addListener(_docChanged);
   }
 
@@ -25,16 +24,18 @@ class Passes extends ChangeNotifier {
   final Wallet _balance;
   final WalletWriter _writer;
   final WalletDelegate _delegate;
-  final Clock _clock;
+
+  /// The server's time now.
+  final DateTime Function() _now;
 
   Map<String, Object?> _passes = const {};
 
   /// Pass [id] as the wallet keeps it.
-  PassState state(String id) => PassState.from(_passes[id], _clock.now, _delegate.timeOf);
+  PassState state(String id) => PassState.from(_passes[id], _now(), _delegate.timeOf);
 
   /// Pass [id] may be used now, by the server's clock, whatever its type: running, owned, or with uses left.
   bool on(String id) {
-    final p = state(id), now = _clock.now;
+    final p = state(id), now = _now();
     if (p.owned) return true;
     if (p.until != null) return p.until!.isAfter(now);
     if (p.from == null) return p.left > 0;
@@ -44,7 +45,7 @@ class Passes extends ChangeNotifier {
 
   /// Pass [id]'s uses left now: a counter's, a limited pass's while it runs, a daily pass's today.
   int left(String id) {
-    final p = state(id), now = _clock.now;
+    final p = state(id), now = _now();
     if (p.days > 0) return p.dailyLeft(now);
     return p.from == null || p.within(now) ? p.left : 0;
   }
@@ -53,7 +54,7 @@ class Passes extends ChangeNotifier {
   /// date ([SpendResult.failed]), or past a counter's most uses ([SpendResult.overLimit]); null when it can.
   SpendResult? refusal(String id, PassTerms terms) {
     final until = terms.until;
-    if (terms.type == PassType.until && (until == null || !until.isAfter(_clock.now))) return SpendResult.failed;
+    if (terms.type == PassType.until && (until == null || !until.isAfter(_now()))) return SpendResult.failed;
     if (terms.max > 0 && left(id) + terms.count > terms.max) return SpendResult.overLimit;
     return null;
   }
@@ -61,7 +62,7 @@ class Passes extends ChangeNotifier {
   /// The fields that give pass [id] on [terms] as its type gives it; null when it is held already (one that stacks adds
   /// its minutes instead). A purchase and a bundle both write them.
   Map<String, Object?>? grant(String id, PassTerms terms) {
-    final p = state(id), now = _clock.now, at = _delegate.serverTime, until = terms.until;
+    final p = state(id), now = _now(), at = _delegate.serverTime, until = terms.until;
     String path(String key) => WalletKeys.pass(id, key);
     final whole = '${WalletKeys.passes}.$id';
     return switch (terms.type) {
@@ -104,7 +105,7 @@ class Passes extends ChangeNotifier {
     if (refused != null) return refused;
     final change = grant(id, terms);
     if (change == null) return SpendResult.done;
-    final counted = countBuy(_delegate, _doc.data, WalletKeys.passBuys, id, terms.limit, _clock.now);
+    final counted = countBuy(_delegate, _doc.data, WalletKeys.passBuys, id, terms.limit, _now());
     if (counted == null) return SpendResult.overLimit;
     return _balance.spend(terms.price, {...change, ...counted, ...LastWriteKeys.of(LastWriteKeys.passBought, id)});
   }
@@ -112,7 +113,7 @@ class Passes extends ChangeNotifier {
   /// One use of pass [id] (a counter, a limited pass while it runs, a daily pass within today's count), offline too;
   /// false with none left.
   Future<bool> use(String id) async {
-    final uid = _doc.uid, p = state(id), now = _clock.now;
+    final uid = _doc.uid, p = state(id), now = _now();
     if (uid.isEmpty || left(id) < 1) return false;
     String path(String key) => WalletKeys.pass(id, key);
     final w = p.windowAt(now);

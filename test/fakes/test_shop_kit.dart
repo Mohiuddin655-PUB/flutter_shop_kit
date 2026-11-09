@@ -19,7 +19,7 @@ class TestShopKit {
     ShopKit.reset();
     ShopKit.setup(
       walletDelegate: delegate,
-      clock: clock,
+      now: () => clock.now,
       catalogDelegate: FakeCatalogDelegate(catalog ?? testCatalog),
       writeWait: const Duration(milliseconds: 50),
     );

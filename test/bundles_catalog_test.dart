@@ -53,7 +53,7 @@ void main() {
     ShopKit.reset();
     ShopKit.setup(
       walletDelegate: t.delegate,
-      clock: t.clock,
+      now: () => t.clock.now,
       catalogDelegate: _Empty(),
       fallbackPasses: const {
         'filters': {CatalogKeys.type: 'duration', CatalogKeys.minutes: 60, CatalogKeys.price: 100},

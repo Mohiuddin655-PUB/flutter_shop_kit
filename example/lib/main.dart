@@ -6,7 +6,7 @@ import 'memory_wallet_delegate.dart';
 import 'shop_page.dart';
 
 /// A shop on a wallet kept in memory, so it runs without a backend. A real app gives Firestore (or its own server)
-/// through the same three delegates.
+/// through the same two delegates.
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
   final wallet = MemoryWalletDelegate(
@@ -14,7 +14,8 @@ void main() {
       WalletKeys.points: {WalletKeys.amount: 1000},
     },
   );
-  ShopKit.setup(walletDelegate: wallet, clock: const SystemClock(), catalogDelegate: MemoryCatalogDelegate());
+  // No `now`: the phone's clock is enough here; a real shop gives the server's.
+  ShopKit.setup(walletDelegate: wallet, catalogDelegate: MemoryCatalogDelegate());
   ShopKit.start('demo-user');
   runApp(
     MaterialApp(
@@ -22,12 +23,4 @@ void main() {
       home: ShopPage(wallet: wallet),
     ),
   );
-}
-
-/// The phone's clock; a real app gives the server's.
-class SystemClock implements Clock {
-  const SystemClock();
-
-  @override
-  DateTime get now => DateTime.now().toUtc();
 }

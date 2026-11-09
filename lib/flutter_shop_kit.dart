@@ -1,5 +1,5 @@
 /// What an account holds and buys with its in-app currency: [ShopKit] (its balance, inventory, passes, bundles and
-/// catalog), what the app gives it ([WalletDelegate], [Clock], [CatalogDelegate], [ErrorReporter]), and the
+/// catalog), what the app gives it ([WalletDelegate], [CatalogDelegate], [ErrorReporter], the server's time), and the
 /// terms and keys they share. See README.md.
 library;
 
@@ -7,7 +7,6 @@ export 'keys/catalog_keys.dart';
 export 'keys/last_write_keys.dart';
 export 'keys/wallet_keys.dart';
 export 'src/delegates/catalog_delegate.dart';
-export 'src/delegates/clock.dart';
 export 'src/delegates/error_reporter.dart';
 export 'src/delegates/wallet_delegate.dart';
 export 'src/enums/pass_type.dart';

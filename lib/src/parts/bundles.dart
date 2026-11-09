@@ -1,6 +1,5 @@
 import '../../keys/last_write_keys.dart';
 import '../../keys/wallet_keys.dart';
-import '../delegates/clock.dart';
 import '../delegates/wallet_delegate.dart';
 import '../enums/spend_result.dart';
 import '../models/bundle_terms.dart';
@@ -14,7 +13,7 @@ import 'wallet_doc.dart';
 /// Buying a bundle: its items ([Inventory]) and its passes ([Passes], each on the catalog's terms) in one
 /// spend, offline too. Holds nothing itself: what a bundle gives is owned and held as if bought alone.
 class Bundles {
-  const Bundles(this._doc, this._balance, this._inventory, this._passes, this._catalog, this._delegate, this._clock);
+  const Bundles(this._doc, this._balance, this._inventory, this._passes, this._catalog, this._delegate, this._now);
 
   final WalletDoc _doc;
   final Wallet _balance;
@@ -22,7 +21,9 @@ class Bundles {
   final Passes _passes;
   final Catalog _catalog;
   final WalletDelegate _delegate;
-  final Clock _clock;
+
+  /// The server's time now.
+  final DateTime Function() _now;
 
   /// Bundle [id] on [terms] (as the screen showed them). Nothing is taken when it has no passes and every item is
   /// owned. A pass the catalog doesn't sell is [SpendResult.failed]; one the rules refuse is its
@@ -39,7 +40,7 @@ class Bundles {
       if (given == null) return SpendResult.overLimit;
       grant.addAll(given);
     }
-    final counted = countBuy(_delegate, _doc.data, WalletKeys.bundleBuys, id, terms.limit, _clock.now);
+    final counted = countBuy(_delegate, _doc.data, WalletKeys.bundleBuys, id, terms.limit, _now());
     if (counted == null) return SpendResult.overLimit;
     return _balance.spend(terms.price, {
       if (terms.items.isNotEmpty) WalletKeys.items: _delegate.arrayUnion(terms.items),
