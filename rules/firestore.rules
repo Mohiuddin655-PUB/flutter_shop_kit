@@ -1,0 +1,217 @@
+rules_version = '2';
+
+// flutter_shop_kit's security rules: what the app may write on an account's wallet, checked against the admin's
+// catalog. Copy this into your firestore.rules and change the two paths marked CHANGE: where the catalog lives, and
+// where each account's wallet lives. Only the server (with the Admin SDK) adds to the balance; the app only spends it,
+// one thing at a time and at exactly the catalog's price, never below zero.
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isOwner(uid) {
+      return request.auth != null && request.auth.uid == uid;
+    }
+
+    // The catalog, read once per write. CHANGE: its path.
+    function shop() {
+      return get(/databases/$(database)/documents/config/shop).data;
+    }
+
+    // [item]'s price now: its sale's while the sale runs.
+    function priceOf(item) {
+      let sale = item.get('sale', null);
+      let runs = sale != null && sale.get('from', request.time) <= request.time && request.time < sale.until;
+      return runs ? sale.price : item.get('price', 0);
+    }
+
+    function shopPrice(id) {
+      return priceOf(shop().items.get(id, {}));
+    }
+
+    // The balance before and after this write, and the price it must have taken.
+    function pointsBefore() {
+      return resource.data.get('points', {}).get('amount', 0);
+    }
+
+    function spends(price) {
+      return price > 0
+        && request.resource.data.points.amount == pointsBefore() - price
+        && request.resource.data.points.amount >= 0
+        && request.resource.data.points.diff(resource.data.get('points', {})).affectedKeys().hasOnly(['amount']);
+    }
+
+    // One catalog item not owned yet, added last to `items`, for its price.
+    function buysItem() {
+      let before = resource.data.get('items', []);
+      let after = request.resource.data.items;
+      let id = after[after.size() - 1];
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly(['points', 'items'])
+        && after is list && after.size() == before.size() + 1 && after.hasAll(before) && !(id in before)
+        && spends(shopPrice(id));
+    }
+
+    // ---- Passes ------------------------------------------------------------------------------------------------------------
+    // Every pass is the catalog's (`config/shop` `passes`, by id), of one type:
+    //   duration  runs `minutes` from the server's time it was bought (`from`, `minutes`); bought again only once over, or,
+    //             with `stack`, adding its minutes while it runs;
+    //   counter   adds `count` uses (`left`), each use taking one;
+    //   lifetime  on for good once bought (`owned`);
+    //   daily     `count` uses in each 24 hours from when it was bought, for `days` (`from`, `days`, `count`, and the
+    //             24 hours used in, `window`, with its uses, `used`);
+    //   limited   `count` uses within `minutes` of when it was bought (`from`, `minutes`, `left`);
+    //   until     on until the catalog's `until` (`until`).
+    // The write names its pass in `lastWrite`, as rules can't find which one changed, and changes nothing else, so a new
+    // pass of these types needs no deploy.
+    //
+    // `lastWrite` (`{kind, id}`) is for these rules alone; the app never reads it. Each write of a pass or a bundle sets
+    // it whole: its `kind` (`passBought`, `passUsed` or `bundleBought`) and its pass's or bundle's `id`.
+    function writtenFor(kind) {
+      let w = request.resource.data.get('lastWrite', {});
+      return w.get('kind', null) == kind && w.keys().hasOnly(['kind', 'id']) ? w.get('id', null) : null;
+    }
+
+    function passTerms(id) {
+      return shop().get('passes', {}).get(id, {});
+    }
+
+    function passBefore(id) {
+      return resource.data.get('passes', {}).get(id, {});
+    }
+
+    // A write on pass [id] alone, changing none but [fields] of the wallet.
+    function passChanged(id, fields) {
+      return id is string
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(fields)
+        && request.resource.data.passes.diff(resource.data.get('passes', {})).affectedKeys().hasOnly([id]);
+    }
+
+    // A pass or a bundle with a `limit` (`{count, minutes}`: `count` buys in each `minutes`, or for good without `minutes`) keeps
+    // its buys in [buys] (`passBuys` or `bundleBuys`) by [id]: `{count, from}`, `from` the server's time the first buy
+    // of the minutes. Without a limit, its buys are left alone; the others' always are.
+    function buysWithin(buys, id, limit) {
+      let before = resource.data.get(buys, {}).get(id, {});
+      let after = request.resource.data.get(buys, {}).get(id, {});
+      let fresh = before.get('from', null) == null
+        || (limit != null && limit.get('minutes', 0) > 0 && before.from + duration.value(limit.minutes, 'm') <= request.time);
+      let changed = request.resource.data.get(buys, {}).diff(resource.data.get(buys, {})).affectedKeys();
+      return limit == null
+        ? changed.size() == 0
+        : changed.hasOnly([id]) && (fresh ? after == {'count': 1, 'from': request.time} : (after.from == before.from && after.count == before.count + 1))
+          && after.count <= limit.count;
+    }
+
+    // [p] runs [minutes] from its `from`, now.
+    function within(p, minutes) {
+      return p.get('from', null) != null && p.from + duration.value(minutes, 'm') > request.time;
+    }
+
+    // The 24 hours of a daily pass [p] the server's time is in: 0 the first.
+    function windowOf(p) {
+      return math.floor((request.time - p.from).seconds() / 86400);
+    }
+
+    function dailyOn(p) {
+      return p.get('from', null) != null && windowOf(p) < p.days;
+    }
+
+    function buysDuration(terms, before, after) {
+      return after.keys().hasOnly(['from', 'minutes']) && (
+        within(before, before.get('minutes', 0))
+          ? terms.get('stack', false) == true && after.from == before.from && after.minutes == before.minutes + terms.minutes
+          : after.from == request.time && after.minutes == terms.minutes);
+    }
+
+    // A counter with a `max` holds at most that many uses.
+    function buysCounter(terms, before, after) {
+      return after.keys().hasOnly(['left']) && after.left == before.get('left', 0) + terms.count
+        && (terms.get('max', 0) == 0 || after.left <= terms.max);
+    }
+
+    function buysLifetime(before, after) {
+      return before.get('owned', false) != true && after == {'owned': true};
+    }
+
+    function buysDaily(terms, before, after) {
+      return !dailyOn(before)
+        && after == {'from': request.time, 'days': terms.days, 'count': terms.count, 'window': 0, 'used': 0};
+    }
+
+    function buysLimited(terms, before, after) {
+      return !(within(before, before.get('minutes', 0)) && before.get('left', 0) > 0)
+        && after == {'from': request.time, 'minutes': terms.minutes, 'left': terms.count};
+    }
+
+    function buysUntil(terms, before, after) {
+      return terms.until > request.time && !(before.get('until', request.time) > request.time) && after == {'until': terms.until};
+    }
+
+    // Pass [id] given as its type gives it: what a purchase or a bundle writes on it.
+    function grantsPass(id) {
+      let terms = passTerms(id);
+      let type = terms.get('type', '');
+      let before = passBefore(id);
+      let after = request.resource.data.passes.get(id, {});
+      return (type == 'duration' && buysDuration(terms, before, after))
+        || (type == 'counter' && buysCounter(terms, before, after))
+        || (type == 'lifetime' && buysLifetime(before, after))
+        || (type == 'daily' && buysDaily(terms, before, after))
+        || (type == 'limited' && buysLimited(terms, before, after))
+        || (type == 'until' && buysUntil(terms, before, after));
+    }
+
+    function buysPass() {
+      let id = writtenFor('passBought');
+      return passChanged(id, ['points', 'passes', 'lastWrite', 'passBuys'])
+        && grantsPass(id)
+        && buysWithin('passBuys', id, passTerms(id).get('limit', null))
+        && spends(priceOf(passTerms(id)));
+    }
+
+    // ---- Bundles -----------------------------------------------------------------------------------------------------------
+    // A bundle (the catalog's `bundles`, by id) gives its `items` (those not owned yet) and its `passes` (up to 3 by id,
+    // each as its type gives it), for its `price`, within its `limit`. The write names it (`lastWrite`) and changes
+    // nothing else. Rules can't loop, so each of the 3 is checked by itself.
+    function buysBundle() {
+      let id = writtenFor('bundleBought');
+      let bundle = shop().get('bundles', {}).get(id, {});
+      let ids = bundle.get('passes', []);
+      let before = resource.data.get('items', []);
+      let after = request.resource.data.get('items', []);
+      return id is string && bundle.get('price', null) != null
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['points', 'items', 'passes', 'lastWrite', 'bundleBuys'])
+        && after.toSet() == before.toSet().union(bundle.get('items', []).toSet()) && after.size() == after.toSet().size()
+        && ids is list && ids.size() <= 3
+        && (ids.size() == 0
+          ? request.resource.data.get('passes', {}) == resource.data.get('passes', {})
+          : request.resource.data.passes.diff(resource.data.get('passes', {})).affectedKeys().hasOnly(ids)
+            && grantsPass(ids[0]) && (ids.size() < 2 || grantsPass(ids[1])) && (ids.size() < 3 || grantsPass(ids[2])))
+        && buysWithin('bundleBuys', id, bundle.get('limit', null))
+        && spends(priceOf(bundle));
+    }
+
+    // One use: a counter's, a limited pass's while it runs, or a daily pass's within its day's count; no points.
+    function usesPass() {
+      let id = writtenFor('passUsed');
+      let type = passTerms(id).get('type', '');
+      let before = passBefore(id);
+      let after = request.resource.data.passes.get(id, {});
+      let w = type == 'daily' && before.get('from', null) != null ? windowOf(before) : 0;
+      return passChanged(id, ['passes', 'lastWrite'])
+        && ((type == 'counter' && after.keys().hasOnly(['left']) && after.left == before.get('left', 0) - 1 && after.left >= 0)
+          || (type == 'limited' && within(before, before.get('minutes', 0))
+            && after.diff(before).affectedKeys().hasOnly(['left']) && after.left == before.left - 1 && after.left >= 0)
+          || (type == 'daily' && dailyOn(before) && after.diff(before).affectedKeys().hasOnly(['window', 'used'])
+            && after.window == w && after.used == (before.window == w ? before.used : 0) + 1 && after.used <= before.count));
+    }
+
+    // CHANGE: where each account's wallet lives.
+    match /accounts/{uid}/wallet/main {
+      allow read: if isOwner(uid);
+      allow update: if isOwner(uid) && (buysItem() || buysPass() || usesPass() || buysBundle());
+    }
+
+    // The catalog: read by any signed-in account, written by the admin only (Admin SDK).
+    match /config/shop {
+      allow read: if request.auth != null;
+      allow write: if false;
+    }
+  }
+}

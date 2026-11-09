@@ -1,0 +1,74 @@
+import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter_shop_kit/flutter_shop_kit.dart';
+
+import 'fake_catalog_source.dart';
+import 'fake_clock.dart';
+import 'fake_backend.dart';
+
+/// A test's kit: [uid] signed in with [points] and [more] fields, on [catalog], heard once.
+class TestShopKit {
+  TestShopKit._(this.clock, this.backend);
+
+  static Future<TestShopKit> make({int points = 1000, Map<String, dynamic> more = const {}, Map<String, Object?>? catalog}) async {
+    TestWidgetsFlutterBinding.ensureInitialized();
+    final clock = FakeClock(), backend = FakeBackend(clock);
+    backend.server = {
+      WalletKeys.points: {WalletKeys.amount: points},
+      ...more,
+    };
+    ShopKit.reset();
+    ShopKit.setup(backend: backend, clock: clock, catalogSource: FakeCatalogSource(catalog ?? testCatalog), writeWait: const Duration(milliseconds: 50));
+    ShopKit.start(uid);
+    await settle();
+    return TestShopKit._(clock, backend);
+  }
+
+  static const uid = 'u1';
+
+  final FakeClock clock;
+  final FakeBackend backend;
+
+  /// The wallet as the phone shows it.
+  Map<String, dynamic> get local => backend.local ?? {};
+
+  /// Lets the streams and the queue run.
+  static Future<void> settle() => Future<void>.delayed(Duration.zero);
+}
+
+/// Items `a1` (100) and `a2` (200, on sale for 150 within its dates); passes of each type; bundles.
+final testCatalog = <String, Object?>{
+  CatalogKeys.items: {
+    'a1': {CatalogKeys.price: 100},
+    'a2': {
+      CatalogKeys.price: 200,
+      CatalogKeys.sale: {CatalogKeys.price: 150, CatalogKeys.until: DateTime.utc(2026, 11, 10).millisecondsSinceEpoch},
+    },
+  },
+  CatalogKeys.passes: {
+    'filters': {CatalogKeys.type: 'duration', CatalogKeys.minutes: 60, CatalogKeys.price: 100},
+    'boost': {CatalogKeys.type: 'duration', CatalogKeys.minutes: 30, CatalogKeys.stack: true, CatalogKeys.price: 50},
+    'likes': {CatalogKeys.type: 'counter', CatalogKeys.count: 20, CatalogKeys.max: 30, CatalogKeys.price: 150},
+    'vip': {CatalogKeys.type: 'lifetime', CatalogKeys.price: 500},
+    'daily': {CatalogKeys.type: 'daily', CatalogKeys.days: 3, CatalogKeys.count: 2, CatalogKeys.price: 120},
+    'supers': {CatalogKeys.type: 'limited', CatalogKeys.minutes: 1440, CatalogKeys.count: 3, CatalogKeys.price: 80},
+    'eid': {CatalogKeys.type: 'until', CatalogKeys.until: DateTime.utc(2026, 11, 15).millisecondsSinceEpoch, CatalogKeys.price: 90},
+    'deal': {
+      CatalogKeys.type: 'counter',
+      CatalogKeys.count: 5,
+      CatalogKeys.price: 40,
+      CatalogKeys.limit: {CatalogKeys.count: 1, CatalogKeys.minutes: 1440},
+    },
+  },
+  CatalogKeys.bundles: {
+    'welcome': {
+      CatalogKeys.price: 300,
+      CatalogKeys.items: ['a1', 'a2'],
+      CatalogKeys.passes: ['filters', 'likes'],
+      CatalogKeys.limit: {CatalogKeys.count: 1},
+    },
+    'royal': {
+      CatalogKeys.price: 400,
+      CatalogKeys.passes: ['vip'],
+    },
+  },
+};

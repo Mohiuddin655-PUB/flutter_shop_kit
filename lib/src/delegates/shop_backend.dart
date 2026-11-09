@@ -1,0 +1,36 @@
+import 'catalog_source.dart';
+
+/// The server side of the account's wallet document, given by the app (Firestore, its own API, or a fake in tests):
+/// hearing and writing the wallet, and the server's own values (an increment, a list union, its time). The catalog
+/// comes from [CatalogSource] instead. A write must show in [watch] at once, before the server has it, and wait in a
+/// queue while offline: that is what lets buying work offline.
+abstract interface class ShopBackend {
+  /// Account [uid]'s wallet fields now and each time they change, its own writes included at once; null when it has
+  /// none.
+  Stream<Map<String, dynamic>?> watch(String uid);
+
+  /// [change] (field paths with dots) written on [uid]'s wallet: completes once the server has it, and throws when the
+  /// server refuses it, which undoes it in [watch].
+  Future<void> update(String uid, Map<String, Object?> change);
+
+  /// [by] added by the server, as a field's value.
+  Object increment(int by);
+
+  /// [values] added to a list field where it lacks them, as a field's value.
+  Object arrayUnion(List<Object?> values);
+
+  /// The server's time at the write, as a field's value.
+  Object get serverTime;
+
+  /// [time] as a stored date.
+  Object storedTime(DateTime time);
+
+  /// A stored date as a time; null when [value] isn't one (a server time still on its way reads as null).
+  DateTime? timeOf(Object? value);
+
+  /// The phone is online.
+  bool get online;
+
+  /// [error] only says the server couldn't be reached in time, not that it refused.
+  bool unreachable(Object error);
+}
