@@ -1,9 +1,9 @@
 import 'package:flutter/foundation.dart' show visibleForTesting;
 
-import 'delegates/catalog_source.dart';
+import 'delegates/catalog_delegate.dart';
 import 'delegates/clock.dart';
 import 'delegates/error_reporter.dart';
-import 'delegates/shop_backend.dart';
+import 'delegates/wallet_delegate.dart';
 import 'parts/bundles.dart';
 import 'parts/catalog.dart';
 import 'parts/inventory.dart';
@@ -24,15 +24,15 @@ abstract final class ShopKit {
   /// Sets the kit up with what the app gives it, once, as the app starts (after Flutter's binding is ready). Before the
   /// catalog has a copy, [fallbackPasses] (the catalog's `passes`, as the admin writes them) are sold.
   static void setup({
-    required ShopBackend backend,
+    required WalletDelegate walletDelegate,
     required Clock clock,
-    required CatalogSource catalogSource,
+    required CatalogDelegate catalogDelegate,
     ErrorReporter? onError,
     Map<String, Object?> fallbackPasses = const {},
     Duration writeWait = const Duration(seconds: 10),
   }) {
     if (_parts != null) throw StateError('ShopKit.setup was called already.');
-    _parts = _Parts(backend, clock, catalogSource, onError, fallbackPasses, writeWait);
+    _parts = _Parts(walletDelegate, clock, catalogDelegate, onError, fallbackPasses, writeWait);
   }
 
   static Wallet get wallet => _p.wallet;
@@ -59,14 +59,14 @@ abstract final class ShopKit {
 }
 
 class _Parts {
-  _Parts(ShopBackend backend, Clock clock, CatalogSource source, ErrorReporter? onError, Map<String, Object?> fallback, Duration wait)
-    : doc = WalletDoc(backend, onError) {
-    final writer = WalletWriter(backend, onError, wait: wait);
-    wallet = Wallet(doc, writer, backend);
-    inventory = Inventory(doc, wallet, backend);
-    passes = Passes(doc, wallet, writer, backend, clock);
+  _Parts(WalletDelegate delegate, Clock clock, CatalogDelegate source, ErrorReporter? onError, Map<String, Object?> fallback, Duration wait)
+    : doc = WalletDoc(delegate, onError) {
+    final writer = WalletWriter(delegate, onError, wait: wait);
+    wallet = Wallet(doc, writer, delegate);
+    inventory = Inventory(doc, wallet, delegate);
+    passes = Passes(doc, wallet, writer, delegate, clock);
     catalog = Catalog(source, clock, fallbackPasses: fallback);
-    bundles = Bundles(doc, wallet, inventory, passes, catalog, backend, clock);
+    bundles = Bundles(doc, wallet, inventory, passes, catalog, delegate, clock);
   }
 
   final WalletDoc doc;

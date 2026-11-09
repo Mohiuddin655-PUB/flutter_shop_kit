@@ -56,40 +56,40 @@ Items (`inventory.buy`) and bundles (`bundles.buy`) flow the same way; a pass's 
 ## Architecture
 
 ```
-┌──────────────────────── your app ────────────────────────┐
-│  Shop page, Profile, …  ──listen──►  ShopKit.wallet       │
-│                                      ShopKit.inventory    │
-│                                      ShopKit.passes       │
-│                                      ShopKit.bundles      │
-│                                      ShopKit.catalog      │
-└──────────────────────────────┬────────────────────────────┘
-                               │ static API
-┌──────────────────────── flutter_shop_kit ────────────────┐
-│ ShopKit ── Wallet · Inventory · Passes · Bundles          │
-│              │ read their own fields from                 │
-│              ▼                                            │
-│           WalletDoc (one listener)    WalletWriter        │
-│              │                        (pending / refused) │
-│ Catalog ◄── CatalogSource             Clock               │
-└──────┬──────────────────┬──────────────────┬─────────────┘
-       │ ShopBackend      │ CatalogSource    │ Clock
-┌──────▼──────────────────▼──────────────────▼─────────────┐
-│ Firestore wallet doc   config/shop + cache  server time   │
-│ (your delegate)        (your delegate)      (your delegate)│
-│                                                           │
-│ Firestore rules: rules/firestore.rules checks every write │
-│ Your server (Admin SDK) is the only one adding currency   │
-└───────────────────────────────────────────────────────────┘
+┌──────────────────────────── your app ───────────────────────────────┐
+│  Shop page, Profile, …  ──listen──►  ShopKit.wallet                 │
+│                                      ShopKit.inventory              │
+│                                      ShopKit.passes                 │
+│                                      ShopKit.bundles                │
+│                                      ShopKit.catalog                │
+└─────────────────────────────────┬───────────────────────────────────┘
+                                  │ static API
+┌──────────────────────────── flutter_shop_kit ───────────────────────┐
+│  ShopKit ── Wallet · Inventory · Passes · Bundles                   │
+│                │ read their own fields from                         │
+│                ▼                                                    │
+│             WalletDoc (one listener)      WalletWriter              │
+│                                           (pending / refused)       │
+│  Catalog ◄── CatalogDelegate              Clock                     │
+└──────┬─────────────────────┬─────────────────────┬──────────────────┘
+       │ WalletDelegate      │ CatalogDelegate     │ Clock
+┌──────▼─────────────────────▼─────────────────────▼──────────────────┐
+│  wallet document         catalog + its cache    server time         │
+│  (your delegate)         (your delegate)        (your delegate)     │
+│                                                                     │
+│  Firestore rules (rules/firestore.rules) check every write          │
+│  Your server (Admin SDK) is the only one adding currency            │
+└─────────────────────────────────────────────────────────────────────┘
 ```
 
 | Delegate | What it does | Firestore example |
 |---|---|---|
-| `ShopBackend` | Hears and writes the account's wallet; the server's increment, list union and time | the wallet document |
-| `CatalogSource` | The admin's catalog: the phone's copy, the server's at a version | `config/shop`, cached |
+| `WalletDelegate` | Hears and writes the account's wallet; the server's increment, list union and time | the wallet document |
+| `CatalogDelegate` | The admin's catalog: the phone's copy, the server's at a version | `config/shop`, cached |
 | `Clock` | The server's time, so passes, sales and limits match the rules | a server-time offset |
 | `ErrorReporter` | Records unexpected errors (optional) | Crashlytics |
 
-`ShopBackend` must show a write in `watch` at once and keep it in a queue while offline. Firestore does both by itself;
+`WalletDelegate` must show a write in `watch` at once and keep it in a queue while offline. Firestore does both by itself;
 with another backend, your delegate does.
 
 ## Data
@@ -117,7 +117,7 @@ The wallet document (one per account):
 `points` is the balance whatever your currency is called; only your server adds to it. `lastWrite` is for the security
 rules alone (they can't find which pass changed).
 
-The catalog (times as milliseconds since the epoch, UTC, in what `CatalogSource` gives):
+The catalog (times as milliseconds since the epoch, UTC, in what `CatalogDelegate` gives):
 
 ```json
 {
@@ -156,7 +156,7 @@ dependencies:
 ### 2. Write the delegates (Firestore)
 
 ```dart
-class FirestoreShopBackend implements ShopBackend {
+class FirestoreWalletDelegate implements WalletDelegate {
   final _db = FirebaseFirestore.instance;
   DocumentReference<Map<String, dynamic>> _doc(String uid) => _db.doc('accounts/$uid/wallet/main');
 
@@ -181,7 +181,7 @@ class FirestoreShopBackend implements ShopBackend {
 }
 ```
 
-`CatalogSource` reads `config/shop` (converting `Timestamp`s to milliseconds) and keeps a copy on the phone; `Clock` gives
+`CatalogDelegate` reads `config/shop` (converting `Timestamp`s to milliseconds) and keeps a copy on the phone; `Clock` gives
 the server's time (for example `DateTime.now()` plus an offset from your server).
 
 ### 3. Set it up once, start and clear with the account
@@ -191,9 +191,9 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp();
   ShopKit.setup(
-    backend: FirestoreShopBackend(),
+    walletDelegate: FirestoreWalletDelegate(),
     clock: MyServerClock(),
-    catalogSource: MyCatalogSource(),
+    catalogDelegate: MyCatalogDelegate(),
     onError: (e, s, where) => FirebaseCrashlytics.instance.recordError(e, s, reason: where),
   );
   runApp(const MyApp());
@@ -268,7 +268,7 @@ The `example/` app is a whole shop on a wallet kept in memory, with a switch to 
 
 ## Testing
 
-Give `ShopKit.setup` a fake `ShopBackend` (see `test/fakes/fake_backend.dart`), and call `ShopKit.reset()` between
+Give `ShopKit.setup` a fake `WalletDelegate` (see `test/fakes/fake_wallet_delegate.dart`), and call `ShopKit.reset()` between
 tests.
 
 ## Notes

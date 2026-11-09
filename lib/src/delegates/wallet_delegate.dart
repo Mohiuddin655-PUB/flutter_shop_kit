@@ -1,10 +1,10 @@
-import 'catalog_source.dart';
+import 'catalog_delegate.dart';
 
 /// The server side of the account's wallet document, given by the app (Firestore, its own API, or a fake in tests):
 /// hearing and writing the wallet, and the server's own values (an increment, a list union, its time). The catalog
-/// comes from [CatalogSource] instead. A write must show in [watch] at once, before the server has it, and wait in a
+/// comes from [CatalogDelegate] instead. A write must show in [watch] at once, before the server has it, and wait in a
 /// queue while offline: that is what lets buying work offline.
-abstract interface class ShopBackend {
+abstract interface class WalletDelegate {
   /// Account [uid]'s wallet fields now and each time they change, its own writes included at once; null when it has
   /// none.
   Stream<Map<String, dynamic>?> watch(String uid);

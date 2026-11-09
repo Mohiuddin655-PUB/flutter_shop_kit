@@ -3,7 +3,7 @@ import 'package:flutter/foundation.dart';
 import '../../keys/last_write_keys.dart';
 import '../../keys/wallet_keys.dart';
 import '../delegates/clock.dart';
-import '../delegates/shop_backend.dart';
+import '../delegates/wallet_delegate.dart';
 import '../enums/pass_type.dart';
 import '../enums/spend_result.dart';
 import '../models/pass_state.dart';
@@ -17,20 +17,20 @@ import 'wallet_writer.dart';
 /// The account's passes (`passes`, by id) of any [PassType]: whether one may be used, its uses left, buying and
 /// using one, offline too. Told only when the passes change.
 class Passes extends ChangeNotifier {
-  Passes(this._doc, this._balance, this._writer, this._backend, this._clock) {
+  Passes(this._doc, this._balance, this._writer, this._delegate, this._clock) {
     _doc.addListener(_docChanged);
   }
 
   final WalletDoc _doc;
   final Wallet _balance;
   final WalletWriter _writer;
-  final ShopBackend _backend;
+  final WalletDelegate _delegate;
   final Clock _clock;
 
   Map<String, Object?> _passes = const {};
 
   /// Pass [id] as the wallet keeps it.
-  PassState state(String id) => PassState.from(_passes[id], _clock.now, _backend.timeOf);
+  PassState state(String id) => PassState.from(_passes[id], _clock.now, _delegate.timeOf);
 
   /// Pass [id] may be used now, by the server's clock, whatever its type: running, owned, or with uses left.
   bool on(String id) {
@@ -61,15 +61,15 @@ class Passes extends ChangeNotifier {
   /// The fields that give pass [id] on [terms] as its type gives it; null when it is held already (one that stacks adds
   /// its minutes instead). A purchase and a bundle both write them.
   Map<String, Object?>? grant(String id, PassTerms terms) {
-    final p = state(id), now = _clock.now, at = _backend.serverTime, until = terms.until;
+    final p = state(id), now = _clock.now, at = _delegate.serverTime, until = terms.until;
     String path(String key) => WalletKeys.pass(id, key);
     final whole = '${WalletKeys.passes}.$id';
     return switch (terms.type) {
-      PassType.duration when p.within(now) => terms.stack ? {path(WalletKeys.minutes): _backend.increment(terms.minutes)} : null,
+      PassType.duration when p.within(now) => terms.stack ? {path(WalletKeys.minutes): _delegate.increment(terms.minutes)} : null,
       PassType.duration => {
         whole: {WalletKeys.from: at, WalletKeys.minutes: terms.minutes},
       },
-      PassType.counter => {path(WalletKeys.left): _backend.increment(terms.count)},
+      PassType.counter => {path(WalletKeys.left): _delegate.increment(terms.count)},
       PassType.lifetime =>
         p.owned
             ? null
@@ -92,7 +92,7 @@ class Passes extends ChangeNotifier {
         on(id) || until == null
             ? null
             : {
-                whole: {WalletKeys.until: _backend.storedTime(until)},
+                whole: {WalletKeys.until: _delegate.storedTime(until)},
               },
     };
   }
@@ -104,7 +104,7 @@ class Passes extends ChangeNotifier {
     if (refused != null) return refused;
     final change = grant(id, terms);
     if (change == null) return SpendResult.done;
-    final counted = countBuy(_backend, _doc.data, WalletKeys.passBuys, id, terms.limit, _clock.now);
+    final counted = countBuy(_delegate, _doc.data, WalletKeys.passBuys, id, terms.limit, _clock.now);
     if (counted == null) return SpendResult.overLimit;
     return _balance.spend(terms.price, {...change, ...counted, ...LastWriteKeys.of(LastWriteKeys.passBought, id)});
   }
@@ -117,8 +117,8 @@ class Passes extends ChangeNotifier {
     String path(String key) => WalletKeys.pass(id, key);
     final w = p.windowAt(now);
     final Map<String, Object?> change = p.days > 0
-        ? (w == p.window ? {path(WalletKeys.used): _backend.increment(1)} : {path(WalletKeys.window): w, path(WalletKeys.used): 1})
-        : {path(WalletKeys.left): _backend.increment(-1)};
+        ? (w == p.window ? {path(WalletKeys.used): _delegate.increment(1)} : {path(WalletKeys.window): w, path(WalletKeys.used): 1})
+        : {path(WalletKeys.left): _delegate.increment(-1)};
     final result = await _writer.write(uid, {...change, ...LastWriteKeys.of(LastWriteKeys.passUsed, id)}, onRefused: _balance.refused);
     return result == SpendResult.done || result == SpendResult.pending;
   }

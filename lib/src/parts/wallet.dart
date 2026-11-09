@@ -3,7 +3,7 @@ import 'dart:async' show Completer;
 import 'package:flutter/foundation.dart';
 
 import '../../keys/wallet_keys.dart';
-import '../delegates/shop_backend.dart';
+import '../delegates/wallet_delegate.dart';
 import '../enums/spend_result.dart';
 import 'wallet_doc.dart';
 import 'wallet_writer.dart';
@@ -11,13 +11,13 @@ import 'wallet_writer.dart';
 /// The account's balance (`points`): the amount, the last pack bought with money, and spending it, offline too. Told
 /// only when the balance part changes.
 class Wallet extends ChangeNotifier {
-  Wallet(this._doc, this._writer, this._backend) {
+  Wallet(this._doc, this._writer, this._delegate) {
     _doc.addListener(_docChanged);
   }
 
   final WalletDoc _doc;
   final WalletWriter _writer;
-  final ShopBackend _backend;
+  final WalletDelegate _delegate;
 
   int _amount = 0, _refused = 0;
   int? _lastPurchaseAmount;
@@ -39,7 +39,7 @@ class Wallet extends ChangeNotifier {
     final uid = _doc.uid;
     if (uid.isEmpty) return SpendResult.failed;
     if (_amount < price) return SpendResult.notEnough;
-    return _writer.write(uid, {...change, WalletKeys.pointsAmount: _backend.increment(-price)}, onRefused: refused);
+    return _writer.write(uid, {...change, WalletKeys.pointsAmount: _delegate.increment(-price)}, onRefused: refused);
   }
 
   /// A spend or a use the server refused after it showed: told on screen.
@@ -66,7 +66,7 @@ class Wallet extends ChangeNotifier {
     final points = _doc.data?[WalletKeys.points];
     final map = points is Map ? points : const {};
     int? whole(Object? v) => v is num ? v.toInt() : null;
-    final amount = whole(map[WalletKeys.amount]) ?? 0, at = _backend.timeOf(map[WalletKeys.lastPurchaseAt]);
+    final amount = whole(map[WalletKeys.amount]) ?? 0, at = _delegate.timeOf(map[WalletKeys.lastPurchaseAt]);
     final last = whole(map[WalletKeys.lastPurchaseAmount]);
     if (amount == _amount && at == _lastPurchaseAt && last == _lastPurchaseAmount) return;
     _amount = amount;

@@ -34,7 +34,7 @@ void main() {
     ShopKit.wallet.addListener(() => balance++);
     ShopKit.inventory.addListener(() => inventory++);
     ShopKit.passes.addListener(() => passes++);
-    t.backend.serverSets({
+    t.delegate.serverSets({
       WalletKeys.points: {WalletKeys.amount: 1500},
     });
     await TestShopKit.settle();
@@ -44,7 +44,7 @@ void main() {
   test('hears a pack bought after the last one', () async {
     final t = await TestShopKit.make();
     final arrived = ShopKit.wallet.purchaseAfter(null, const Duration(seconds: 1));
-    t.backend.serverSets({
+    t.delegate.serverSets({
       WalletKeys.points: {WalletKeys.amount: 2000, WalletKeys.lastPurchaseAt: t.clock.now, WalletKeys.lastPurchaseAmount: 1000},
     });
     expect(await arrived, 1000);

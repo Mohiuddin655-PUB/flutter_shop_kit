@@ -3,14 +3,14 @@ import 'dart:async' show StreamSubscription, Timer;
 import 'package:flutter/foundation.dart';
 
 import '../delegates/error_reporter.dart';
-import '../delegates/shop_backend.dart';
+import '../delegates/wallet_delegate.dart';
 
 /// The signed-in account's wallet document, heard once for [ShopKit]: its parts read their own fields from here. The
-/// backend's copy at once (its own writes included), then the server's, and each change.
+/// delegate's copy at once (its own writes included), then the server's, and each change.
 class WalletDoc extends ChangeNotifier {
-  WalletDoc(this._backend, this._report);
+  WalletDoc(this._delegate, this._report);
 
-  final ShopBackend _backend;
+  final WalletDelegate _delegate;
   final ErrorReporter? _report;
 
   String _uid = '';
@@ -52,7 +52,7 @@ class WalletDoc extends ChangeNotifier {
     final uid = _uid;
     _retry?.cancel();
     _watch?.cancel();
-    _watch = _backend
+    _watch = _delegate
         .watch(uid)
         .listen(
           (data) {

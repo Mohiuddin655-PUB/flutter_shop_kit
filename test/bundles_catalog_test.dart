@@ -52,9 +52,9 @@ void main() {
     final t = await TestShopKit.make();
     ShopKit.reset();
     ShopKit.setup(
-      backend: t.backend,
+      walletDelegate: t.delegate,
       clock: t.clock,
-      catalogSource: _Empty(),
+      catalogDelegate: _Empty(),
       fallbackPasses: const {
         'filters': {CatalogKeys.type: 'duration', CatalogKeys.minutes: 60, CatalogKeys.price: 100},
       },
@@ -63,7 +63,7 @@ void main() {
   });
 }
 
-class _Empty implements CatalogSource {
+class _Empty implements CatalogDelegate {
   @override
   Map<String, Object?>? cached() => null;
   @override

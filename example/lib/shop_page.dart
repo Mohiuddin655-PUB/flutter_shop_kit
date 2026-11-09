@@ -1,14 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_shop_kit/flutter_shop_kit.dart';
 
-import 'memory_backend.dart';
+import 'memory_wallet_delegate.dart';
 
 /// The shop: the balance, the items, the passes and a bundle, each rebuilt only when its own part changes, with a
 /// switch to go offline and see buys wait for the link.
 class ShopPage extends StatelessWidget {
-  const ShopPage({super.key, required this.backend});
+  const ShopPage({super.key, required this.wallet});
 
-  final MemoryBackend backend;
+  final MemoryWalletDelegate wallet;
 
   Future<void> _say(BuildContext context, Future<SpendResult> buy) async {
     final result = await buy;
@@ -33,7 +33,7 @@ class ShopPage extends StatelessWidget {
         title: ListenableBuilder(listenable: ShopKit.wallet, builder: (_, _) => Text('${ShopKit.wallet.amount} coins')),
         actions: [
           StatefulBuilder(
-            builder: (context, set) => Switch(value: backend.online, onChanged: (on) => set(() => backend.online = on)),
+            builder: (context, set) => Switch(value: wallet.online, onChanged: (on) => set(() => wallet.online = on)),
           ),
         ],
       ),

@@ -3,7 +3,7 @@ import 'dart:async' show Timer, unawaited;
 import 'package:flutter/widgets.dart' show AppLifecycleListener, ChangeNotifier;
 
 import '../../keys/catalog_keys.dart';
-import '../delegates/catalog_source.dart';
+import '../delegates/catalog_delegate.dart';
 import '../delegates/clock.dart';
 import '../models/bundle_terms.dart';
 import '../models/catalog_bundle.dart';
@@ -25,7 +25,7 @@ class Catalog extends ChangeNotifier {
     ask();
   }
 
-  final CatalogSource _source;
+  final CatalogDelegate _source;
   final Clock _clock;
   final Map<String, Object?> _fallback;
   late final AppLifecycleListener _resume;

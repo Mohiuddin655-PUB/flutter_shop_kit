@@ -4,8 +4,8 @@ import 'package:flutter_shop_kit/flutter_shop_kit.dart';
 
 /// A wallet in memory that behaves like Firestore offline: a write shows at once and, while [online] is off, waits in
 /// a queue that goes through when it comes back.
-class MemoryBackend implements ShopBackend {
-  MemoryBackend({Map<String, dynamic> start = const {}}) : _server = _copy(start);
+class MemoryWalletDelegate implements WalletDelegate {
+  MemoryWalletDelegate({Map<String, dynamic> start = const {}}) : _server = _copy(start);
 
   Map<String, dynamic> _server;
   final _queue = <(Map<String, Object?>, Completer<void>)>[];

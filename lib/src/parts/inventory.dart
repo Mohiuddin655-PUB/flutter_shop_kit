@@ -1,20 +1,20 @@
 import 'package:flutter/foundation.dart';
 
 import '../../keys/wallet_keys.dart';
-import '../delegates/shop_backend.dart';
+import '../delegates/wallet_delegate.dart';
 import '../enums/spend_result.dart';
 import 'wallet.dart';
 import 'wallet_doc.dart';
 
 /// The items the account bought, kept for good (`items`), and buying one. Told only when what is owned changes.
 class Inventory extends ChangeNotifier {
-  Inventory(this._doc, this._balance, this._backend) {
+  Inventory(this._doc, this._balance, this._delegate) {
     _doc.addListener(_docChanged);
   }
 
   final WalletDoc _doc;
   final Wallet _balance;
-  final ShopBackend _backend;
+  final WalletDelegate _delegate;
 
   List<String> _items = const [];
 
@@ -28,7 +28,7 @@ class Inventory extends ChangeNotifier {
   Future<SpendResult> buy(String id, int price) async {
     if (owns(id)) return SpendResult.done;
     return _balance.spend(price, {
-      WalletKeys.items: _backend.arrayUnion([id]),
+      WalletKeys.items: _delegate.arrayUnion([id]),
     });
   }
 

@@ -1,35 +1,40 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_shop_kit/flutter_shop_kit.dart';
 
-import 'fake_catalog_source.dart';
+import 'fake_catalog_delegate.dart';
 import 'fake_clock.dart';
-import 'fake_backend.dart';
+import 'fake_wallet_delegate.dart';
 
 /// A test's kit: [uid] signed in with [points] and [more] fields, on [catalog], heard once.
 class TestShopKit {
-  TestShopKit._(this.clock, this.backend);
+  TestShopKit._(this.clock, this.delegate);
 
   static Future<TestShopKit> make({int points = 1000, Map<String, dynamic> more = const {}, Map<String, Object?>? catalog}) async {
     TestWidgetsFlutterBinding.ensureInitialized();
-    final clock = FakeClock(), backend = FakeBackend(clock);
-    backend.server = {
+    final clock = FakeClock(), delegate = FakeWalletDelegate(clock);
+    delegate.server = {
       WalletKeys.points: {WalletKeys.amount: points},
       ...more,
     };
     ShopKit.reset();
-    ShopKit.setup(backend: backend, clock: clock, catalogSource: FakeCatalogSource(catalog ?? testCatalog), writeWait: const Duration(milliseconds: 50));
+    ShopKit.setup(
+      walletDelegate: delegate,
+      clock: clock,
+      catalogDelegate: FakeCatalogDelegate(catalog ?? testCatalog),
+      writeWait: const Duration(milliseconds: 50),
+    );
     ShopKit.start(uid);
     await settle();
-    return TestShopKit._(clock, backend);
+    return TestShopKit._(clock, delegate);
   }
 
   static const uid = 'u1';
 
   final FakeClock clock;
-  final FakeBackend backend;
+  final FakeWalletDelegate delegate;
 
   /// The wallet as the phone shows it.
-  Map<String, dynamic> get local => backend.local ?? {};
+  Map<String, dynamic> get local => delegate.local ?? {};
 
   /// Lets the streams and the queue run.
   static Future<void> settle() => Future<void>.delayed(Duration.zero);

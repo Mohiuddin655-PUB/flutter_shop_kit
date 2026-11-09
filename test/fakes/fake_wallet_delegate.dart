@@ -6,8 +6,8 @@ import 'fake_clock.dart';
 
 /// A wallet in memory that behaves like Firestore offline: a write shows at once (a server time still on its way reads
 /// null), waits in a queue while offline or [holding], and a [refuse]d one is undone and throws.
-class FakeBackend implements ShopBackend {
-  FakeBackend(this.clock);
+class FakeWalletDelegate implements WalletDelegate {
+  FakeWalletDelegate(this.clock);
 
   final FakeClock clock;
 

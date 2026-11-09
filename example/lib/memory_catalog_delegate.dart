@@ -2,7 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_shop_kit/flutter_shop_kit.dart';
 
 /// The admin's catalog, kept in the app for the example: two items (one on sale for a day), four passes and a bundle.
-class MemoryCatalog implements CatalogSource {
+class MemoryCatalogDelegate implements CatalogDelegate {
   @override
   Map<String, Object?>? cached() => {
     CatalogKeys.items: {
