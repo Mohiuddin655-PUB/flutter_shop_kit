@@ -13,7 +13,7 @@ service cloud.firestore {
 
     // The catalog, read once per write. CHANGE: its path.
     function shop() {
-      return get(/databases/$(database)/documents/config/shop).data;
+      return get(/databases/$(database)/documents/configs/shop).data;
     }
 
     // [item]'s price now: its sale's while the sale runs.
@@ -79,7 +79,7 @@ service cloud.firestore {
     }
 
     // ---- Passes ------------------------------------------------------------------------------------------------------------
-    // Every pass is the catalog's (`config/shop` `passes`, by id), of one type:
+    // Every pass is the catalog's (`configs/shop` `passes`, by id), of one type:
     //   duration  runs `minutes` from the server's time it was bought (`from`, `minutes`); bought again only once over, or,
     //             with `stack`, adding its minutes while it runs;
     //   counter   adds `count` uses (`left`), each use taking one;
@@ -247,7 +247,7 @@ service cloud.firestore {
     }
 
     // The catalog: read by any signed-in account, written by the admin only (Admin SDK).
-    match /config/shop {
+    match /configs/shop {
       allow read: if request.auth != null;
       allow write: if false;
     }

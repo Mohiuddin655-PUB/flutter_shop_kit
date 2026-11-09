@@ -78,7 +78,7 @@ Items (`inventory.buy`) and bundles (`bundles.buy`) flow the same way; a pass's 
 | What the app gives | What it does | Firestore example |
 |---|---|---|
 | `WalletDelegate` | Hears and writes the account's wallet; the server's increment, list union and time | the wallet document |
-| `CatalogDelegate` | The admin's catalog: the phone's copy, the server's at a version | `config/shop`, cached |
+| `CatalogDelegate` | The admin's catalog: the phone's copy, the server's at a version | `configs/shop`, cached |
 | `now` (a function, optional) | The server's time, so passes, sales and limits match the rules | a server-time offset |
 | `ErrorReporter` | Records unexpected errors (optional) | Crashlytics |
 
@@ -209,7 +209,7 @@ class FirestoreWalletDelegate implements WalletDelegate {
 }
 ```
 
-`CatalogDelegate` reads `config/shop` (converting `Timestamp`s to milliseconds) and keeps a copy on the phone; `now` gives
+`CatalogDelegate` reads `configs/shop` (converting `Timestamp`s to milliseconds) and keeps a copy on the phone; `now` gives
 the server's time (for example `DateTime.now()` plus an offset from your server). Without `now`, the phone's clock is
 used, which its owner can move, so a real shop gives the server's: the rules go by it.
 
