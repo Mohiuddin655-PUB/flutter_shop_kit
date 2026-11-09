@@ -23,12 +23,15 @@ abstract final class ShopKit {
 
   static DateTime _phoneNow() => DateTime.now().toUtc();
 
+  static bool _on() => true;
+
   static _Parts get _p => _parts ?? (throw StateError('ShopKit.setup must be called first.'));
 
   /// Sets the kit up with what the app gives it, once, as the app starts (after Flutter's binding is ready). [now]
   /// gives the server's time, as the security rules go by it (the phone's clock, which its owner can move, when none
   /// is given). Before the catalog has a copy, [fallbackPasses] (the catalog's `passes`, as the admin writes them) are
-  /// sold.
+  /// sold. [ledger] says whether each spend is recorded in the ledger now, and [history] whether it is read (a history
+  /// screen): both asked at each use, so the app can turn them on and off (say by version); both on when not given.
   static void setup({
     required WalletDelegate walletDelegate,
     DateTime Function()? now,
@@ -36,9 +39,11 @@ abstract final class ShopKit {
     ErrorReporter? onError,
     Map<String, Object?> fallbackPasses = const {},
     Duration writeWait = const Duration(seconds: 10),
+    bool Function()? ledger,
+    bool Function()? history,
   }) {
     if (_parts != null) throw StateError('ShopKit.setup was called already.');
-    _parts = _Parts(walletDelegate, now ?? _phoneNow, catalogDelegate, onError, fallbackPasses, writeWait);
+    _parts = _Parts(walletDelegate, now ?? _phoneNow, catalogDelegate, onError, fallbackPasses, writeWait, ledger ?? _on, history ?? _on);
   }
 
   static Wallet get wallet => _p.wallet;
@@ -73,15 +78,23 @@ abstract final class ShopKit {
 }
 
 class _Parts {
-  _Parts(WalletDelegate delegate, DateTime Function() now, CatalogDelegate source, ErrorReporter? onError, Map<String, Object?> fallback, Duration wait)
-    : doc = WalletDoc(delegate, onError) {
+  _Parts(
+    WalletDelegate delegate,
+    DateTime Function() now,
+    CatalogDelegate source,
+    ErrorReporter? onError,
+    Map<String, Object?> fallback,
+    Duration wait,
+    bool Function() ledgerOn,
+    bool Function() historyOn,
+  ) : doc = WalletDoc(delegate, onError) {
     final writer = WalletWriter(delegate, onError, wait: wait);
-    wallet = Wallet(doc, writer, delegate);
+    catalog = Catalog(source, now, fallbackPasses: fallback);
+    wallet = Wallet(doc, writer, delegate, ledgerOn);
     inventory = Inventory(doc, wallet, delegate);
     passes = Passes(doc, wallet, writer, delegate, now);
-    catalog = Catalog(source, now, fallbackPasses: fallback);
     bundles = Bundles(doc, wallet, inventory, passes, catalog, delegate, now);
-    ledger = Ledger(doc, delegate);
+    ledger = Ledger(doc, delegate, historyOn);
   }
 
   final WalletDoc doc;

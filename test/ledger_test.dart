@@ -71,4 +71,27 @@ void main() {
     final second = await ShopKit.ledger.page(after: first.single, limit: 1);
     expect([first.single.ref, second.single.ref], ['a2', 'a1']);
   });
+
+  test('with the ledger and history off, a spend writes no entry and the history reads nothing', () async {
+    final t = await TestShopKit.make(ledger: false);
+    expect(ShopKit.ledger.enabled, isFalse);
+    expect(await ShopKit.inventory.buy('a1', 100), SpendResult.done);
+    await TestShopKit.settle();
+    expect(ShopKit.inventory.owns('a1'), isTrue);
+    expect(t.delegate.ledgerOnServer, isEmpty);
+    expect(t.local[LastWriteKeys.field], {LastWriteKeys.kind: LastWriteKeys.itemBought, LastWriteKeys.id: 'a1'});
+    expect(await ShopKit.ledger.page(), isEmpty);
+    expect(t.delegate.phone['u1/pending'], isNull);
+  });
+
+  test('with the ledger off, a refusal while open is still told', () async {
+    final t = await TestShopKit.make(ledger: false);
+    t.delegate.online = false;
+    t.delegate.refuse = (_) => true;
+    await ShopKit.inventory.buy('a1', 100);
+    t.delegate.goOnline();
+    await TestShopKit.settle();
+    await TestShopKit.settle();
+    expect(ShopKit.wallet.refusals.single.ref, 'a1');
+  });
 }

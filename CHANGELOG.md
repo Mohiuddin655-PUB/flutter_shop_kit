@@ -1,3 +1,10 @@
+## 0.9.0
+
+- **Ledger and history on or off, by the app**: `ShopKit.setup(ledger: () => …, history: () => …)`, asked at each use
+  (by version, a remote flag…; both on when not given). Ledger off, a spend writes no entry (one write less) and isn't
+  kept to check after a restart; history off, `ShopKit.ledger.page()` reads nothing and `ShopKit.ledger.enabled` is
+  false. The rules template takes a spend without an entry (and checks one that has it), as the server can't know.
+
 ## 0.8.0
 
 - **The wallet last heard is kept on the phone** and shown at the next start before the backend answers, offline

@@ -65,8 +65,14 @@ service cloud.firestore {
       return /databases/$(database)/documents/accounts/$(uid)/wallet/main/ledger/$(id);
     }
 
+    // The app turns the ledger on and off (by version), which these rules can't know: a spend may name no entry, and
+    // one it names is checked.
     function records(uid, reason, ref, price) {
       let entry = request.resource.data.lastWrite.get('entry', null);
+      return entry == null || recordsEntry(uid, entry, reason, ref, price);
+    }
+
+    function recordsEntry(uid, entry, reason, ref, price) {
       return entry is string && !exists(ledgerEntry(uid, entry)) && existsAfter(ledgerEntry(uid, entry))
         && getAfter(ledgerEntry(uid, entry)).data
           == {'kind': 'debit', 'reason': reason, 'ref': ref, 'amount': -price, 'at': request.time, 'source': 'app'};

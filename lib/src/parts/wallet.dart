@@ -16,7 +16,7 @@ import 'wallet_writer.dart';
 /// The account's balance (`points`): the amount, the last pack bought with money, and spending it, offline too. Told
 /// only when the balance part changes.
 class Wallet extends ChangeNotifier {
-  Wallet(this._doc, this._writer, this._delegate) {
+  Wallet(this._doc, this._writer, this._delegate, this._ledgerOn) {
     _doc.addListener(_docChanged);
   }
 
@@ -25,6 +25,9 @@ class Wallet extends ChangeNotifier {
   final WalletDoc _doc;
   final WalletWriter _writer;
   final WalletDelegate _delegate;
+
+  /// The app keeps the ledger now (`ShopKit.setup`'s `ledger`).
+  final bool Function() _ledgerOn;
 
   int _amount = 0;
   List<RefusedSpend> _refusals = const [];
@@ -78,6 +81,11 @@ class Wallet extends ChangeNotifier {
     if (uid.isEmpty) return SpendResult.failed;
     if (_amount < 0) return SpendResult.inDebt;
     if (_amount < price) return SpendResult.notEnough;
+    final paid = {...change, WalletKeys.pointsAmount: _delegate.increment(-price)};
+    // With the ledger off, no entry: nothing kept to check after a restart either (it is checked by its entry).
+    if (!_ledgerOn()) {
+      return _writer.write(uid, {...paid, ...LastWriteKeys.of(reason, ref)}, onRefused: () => refused(reason, ref, price));
+    }
     final id = _delegate.newEntryId(uid);
     final entry = {
       LedgerKeys.kind: LedgerKeys.debit,
@@ -87,12 +95,11 @@ class Wallet extends ChangeNotifier {
       LedgerKeys.at: _delegate.serverTime,
       LedgerKeys.source: LedgerKeys.app,
     };
-    final named = LastWriteKeys.of(reason, ref, entry: id);
     // Kept on the phone until answered, so a refusal after the app was closed is still told ([checkPending]).
     await _pending.add(uid, (id: id, reason: reason, ref: ref, price: price));
     final result = await _writer.write(
       uid,
-      {...change, ...named, WalletKeys.pointsAmount: _delegate.increment(-price)},
+      {...paid, ...LastWriteKeys.of(reason, ref, entry: id)},
       entry: (id: id, data: entry),
       onRefused: () {
         refused(reason, ref, price);

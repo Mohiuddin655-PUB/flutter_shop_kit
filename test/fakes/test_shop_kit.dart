@@ -9,7 +9,7 @@ import 'fake_wallet_delegate.dart';
 class TestShopKit {
   TestShopKit._(this.clock, this.delegate);
 
-  static Future<TestShopKit> make({int points = 1000, Map<String, dynamic> more = const {}, Map<String, Object?>? catalog}) async {
+  static Future<TestShopKit> make({int points = 1000, Map<String, dynamic> more = const {}, Map<String, Object?>? catalog, bool ledger = true}) async {
     TestWidgetsFlutterBinding.ensureInitialized();
     final clock = FakeClock(), delegate = FakeWalletDelegate(clock);
     delegate.server = {
@@ -19,6 +19,8 @@ class TestShopKit {
     ShopKit.reset();
     ShopKit.setup(
       walletDelegate: delegate,
+      ledger: () => ledger,
+      history: () => ledger,
       now: () => clock.now,
       catalogDelegate: FakeCatalogDelegate(catalog ?? testCatalog),
       writeWait: const Duration(milliseconds: 50),

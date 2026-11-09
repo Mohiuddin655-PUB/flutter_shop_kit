@@ -354,6 +354,8 @@ tests.
 
 ## Notes
 
+- The ledger and the history can be turned off by the app: `ShopKit.setup(ledger: …, history: …)`. Ledger off: one
+  write less per spend, and a spend refused after the app was closed isn't told (it is found by its ledger entry).
 - A bundle holds up to 3 passes: the rules check each by itself, as rules can't loop.
 - A daily pass counts 24-hour windows from when it was bought (rules can't know a phone's time zone).
 - The wallet's field names (`points`, `items`, `passes`…) are fixed: the rules template uses them too.
