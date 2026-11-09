@@ -25,6 +25,8 @@ await ShopKit.bundles.buy('starter', ShopKit.catalog.bundle('starter')!);
   and passes without an app release.
 - **Ledger**: every spend recorded as a debit in the same batch (offline too); credits and refunds written by your
   server; read a page at a time for a history screen or support.
+- **Refund debt**: a refund your server takes back in full can leave the balance below zero; `ShopKit.wallet.debt`
+  says how much is owed, and nothing can be spent (`SpendResult.inDebt`) until bought currency pays it back.
 - **Server-checked**: a Firestore rules template checks every price, balance, pass, limit and ledger entry.
 - **Currency-neutral and backend-agnostic**: Firestore, your own API, or memory in tests.
 
@@ -40,6 +42,7 @@ await ShopKit.bundles.buy('starter', ShopKit.catalog.bundle('starter')!);
        ├─ counter past its max ─────────────────► SpendResult.overLimit
        ├─ already held (and doesn't stack) ─────► SpendResult.done      (nothing taken)
        ├─ buying limit reached ─────────────────► SpendResult.overLimit
+       ├─ balance below zero (a refund's debt) ─► SpendResult.inDebt
        ├─ balance too low ──────────────────────► SpendResult.notEnough
        │
        ▼
@@ -282,6 +285,7 @@ final text = switch (result) {
   SpendResult.done => 'Bought',
   SpendResult.pending => 'Bought: it goes through once you are back online',
   SpendResult.notEnough => 'Not enough coins',
+  SpendResult.inDebt => 'Buy coins to pay back what you owe first',
   SpendResult.overLimit => 'You have it already, or its limit is reached',
   SpendResult.offline || SpendResult.failed => "Couldn't buy it",
 };

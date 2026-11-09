@@ -1,3 +1,9 @@
+## 0.4.0
+
+- **Refund debt**: `ShopKit.wallet.debt` is what is owed when the balance is below zero (a server taking back a refund
+  in full), and a spend then is `SpendResult.inDebt`, before `notEnough`.
+- **Breaking**: `SpendResult` has a new value, `inDebt`, so a `switch` over it needs a case for it.
+
 ## 0.3.0
 
 - **Ledger**: every spend is recorded as a debit in the wallet's `ledger`, written in the same batch as the spend

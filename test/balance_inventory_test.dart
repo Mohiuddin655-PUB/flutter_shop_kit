@@ -28,6 +28,18 @@ void main() {
     expect(ShopKit.inventory.owns('a1'), isFalse);
   });
 
+  test('in debt, nothing can be spent and the debt is told', () async {
+    await TestShopKit.make(points: -150);
+    expect(ShopKit.wallet.debt, 150);
+    expect(await ShopKit.inventory.buy('a1', 100), SpendResult.inDebt);
+    expect(ShopKit.inventory.owns('a1'), isFalse);
+  });
+
+  test('no debt with a balance at or above zero', () async {
+    await TestShopKit.make(points: 0);
+    expect(ShopKit.wallet.debt, 0);
+  });
+
   test('tells each part only of its own change', () async {
     final t = await TestShopKit.make();
     var balance = 0, inventory = 0, passes = 0;

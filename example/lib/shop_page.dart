@@ -20,6 +20,7 @@ class ShopPage extends StatelessWidget {
     SpendResult.done => 'Bought',
     SpendResult.pending => 'Bought: it goes through once back online',
     SpendResult.notEnough => 'Not enough coins',
+    SpendResult.inDebt => 'Buy coins to pay back what you owe first',
     SpendResult.overLimit => 'You have it, or its limit is reached',
     SpendResult.offline => "Couldn't reach the server",
     SpendResult.failed => "Couldn't buy it",

@@ -13,6 +13,10 @@ enum SpendResult {
   /// The balance doesn't cover the price.
   notEnough,
 
+  /// The balance is below zero (a debt, after a refund of currency already spent): nothing can be spent until bought
+  /// currency pays it back.
+  inDebt,
+
   /// The server couldn't be reached.
   offline,
 

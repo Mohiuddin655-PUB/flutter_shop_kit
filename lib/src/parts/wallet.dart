@@ -27,6 +27,9 @@ class Wallet extends ChangeNotifier {
 
   int get amount => _amount;
 
+  /// What is owed when the balance is below zero (after a refund of currency already spent); 0 when nothing is.
+  int get debt => _amount < 0 ? -_amount : 0;
+
   /// The last pack bought with money: when (the server's time) and how much it gave.
   DateTime? get lastPurchaseAt => _lastPurchaseAt;
   int? get lastPurchaseAmount => _lastPurchaseAmount;
@@ -41,6 +44,7 @@ class Wallet extends ChangeNotifier {
   Future<SpendResult> spend(int price, Map<String, Object?> change, {required String reason, required String ref}) async {
     final uid = _doc.uid;
     if (uid.isEmpty) return SpendResult.failed;
+    if (_amount < 0) return SpendResult.inDebt;
     if (_amount < price) return SpendResult.notEnough;
     final id = _delegate.newEntryId(uid);
     final entry = {
