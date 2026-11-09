@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 
+import '../../keys/last_write_keys.dart';
 import '../../keys/wallet_keys.dart';
 import '../delegates/wallet_delegate.dart';
 import '../enums/spend_result.dart';
@@ -27,9 +28,14 @@ class Inventory extends ChangeNotifier {
   /// Item [id] for [price], offline too; nothing is taken when it is owned already.
   Future<SpendResult> buy(String id, int price) async {
     if (owns(id)) return SpendResult.done;
-    return _balance.spend(price, {
-      WalletKeys.items: _delegate.arrayUnion([id]),
-    });
+    return _balance.spend(
+      price,
+      {
+        WalletKeys.items: _delegate.arrayUnion([id]),
+      },
+      reason: LastWriteKeys.itemBought,
+      ref: id,
+    );
   }
 
   void _docChanged() {

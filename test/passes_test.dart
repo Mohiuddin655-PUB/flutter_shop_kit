@@ -95,7 +95,7 @@ void main() {
 
   test('each write names its pass for the rules', () async {
     final (t, _) = await buy('likes');
-    expect(t.local[LastWriteKeys.field], {LastWriteKeys.kind: LastWriteKeys.passBought, LastWriteKeys.id: 'likes'});
+    expect(t.local[LastWriteKeys.field], {LastWriteKeys.kind: LastWriteKeys.passBought, LastWriteKeys.id: 'likes', LastWriteKeys.entry: 'e1'});
     await ShopKit.passes.use('likes');
     await TestShopKit.settle();
     expect(t.local[LastWriteKeys.field][LastWriteKeys.kind], LastWriteKeys.passUsed);

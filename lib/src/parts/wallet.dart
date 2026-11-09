@@ -2,6 +2,8 @@ import 'dart:async' show Completer;
 
 import 'package:flutter/foundation.dart';
 
+import '../../keys/last_write_keys.dart';
+import '../../keys/ledger_keys.dart';
 import '../../keys/wallet_keys.dart';
 import '../delegates/wallet_delegate.dart';
 import '../enums/spend_result.dart';
@@ -33,13 +35,24 @@ class Wallet extends ChangeNotifier {
   /// up with each one, for the screen to say so.
   int get refusedSpends => _refused;
 
-  /// Takes [price] for [change] (what is bought, as the wallet's fields), unless the balance doesn't cover it. Offline
-  /// it is [SpendResult.pending]: shown at once, sent once back online, undone if the server refuses it.
-  Future<SpendResult> spend(int price, Map<String, Object?> change) async {
+  /// Takes [price] for [change] (what is bought, as the wallet's fields), unless the balance doesn't cover it, recording
+  /// it in the ledger as [reason] (a [LastWriteKeys] kind, which names the write too) for [ref], in one batch. Offline it
+  /// is [SpendResult.pending]: shown at once, sent once back online, undone if the server refuses it.
+  Future<SpendResult> spend(int price, Map<String, Object?> change, {required String reason, required String ref}) async {
     final uid = _doc.uid;
     if (uid.isEmpty) return SpendResult.failed;
     if (_amount < price) return SpendResult.notEnough;
-    return _writer.write(uid, {...change, WalletKeys.pointsAmount: _delegate.increment(-price)}, onRefused: refused);
+    final id = _delegate.newEntryId(uid);
+    final entry = {
+      LedgerKeys.kind: LedgerKeys.debit,
+      LedgerKeys.reason: reason,
+      LedgerKeys.ref: ref,
+      LedgerKeys.amount: -price,
+      LedgerKeys.at: _delegate.serverTime,
+      LedgerKeys.source: LedgerKeys.app,
+    };
+    final named = LastWriteKeys.of(reason, ref, entry: id);
+    return _writer.write(uid, {...change, ...named, WalletKeys.pointsAmount: _delegate.increment(-price)}, entry: (id: id, data: entry), onRefused: refused);
   }
 
   /// A spend or a use the server refused after it showed: told on screen.

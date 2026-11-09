@@ -42,11 +42,11 @@ class Bundles {
     }
     final counted = countBuy(_delegate, _doc.data, WalletKeys.bundleBuys, id, terms.limit, _now());
     if (counted == null) return SpendResult.overLimit;
-    return _balance.spend(terms.price, {
-      if (terms.items.isNotEmpty) WalletKeys.items: _delegate.arrayUnion(terms.items),
-      ...grant,
-      ...counted,
-      ...LastWriteKeys.of(LastWriteKeys.bundleBought, id),
-    });
+    return _balance.spend(
+      terms.price,
+      {if (terms.items.isNotEmpty) WalletKeys.items: _delegate.arrayUnion(terms.items), ...grant, ...counted},
+      reason: LastWriteKeys.bundleBought,
+      ref: id,
+    );
   }
 }

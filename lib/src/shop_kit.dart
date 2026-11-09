@@ -6,15 +6,16 @@ import 'delegates/wallet_delegate.dart';
 import 'parts/bundles.dart';
 import 'parts/catalog.dart';
 import 'parts/inventory.dart';
+import 'parts/ledger.dart';
 import 'parts/passes.dart';
 import 'parts/wallet.dart';
 import 'parts/wallet_doc.dart';
 import 'parts/wallet_writer.dart';
 
 /// What the signed-in account holds and buys: its [wallet] (the balance), the items it owns ([inventory]), its
-/// [passes], buying [bundles], and what the admin's [catalog] sells. One wallet document heard once; each part tells
-/// its listeners only when its own part changes. Set up once as the app starts ([setup]), then [start] at sign-in and
-/// [clear] at sign-out.
+/// [passes], buying [bundles], what the admin's [catalog] sells, and the [ledger] of every balance movement. One wallet
+/// document heard once; each part tells its listeners only when its own part changes. Set up once as the app starts
+/// ([setup]), then [start] at sign-in and [clear] at sign-out.
 abstract final class ShopKit {
   static _Parts? _parts;
 
@@ -43,6 +44,7 @@ abstract final class ShopKit {
   static Passes get passes => _p.passes;
   static Bundles get bundles => _p.bundles;
   static Catalog get catalog => _p.catalog;
+  static Ledger get ledger => _p.ledger;
 
   /// The signed-in account; empty when none.
   static String get uid => _p.doc.uid;
@@ -70,6 +72,7 @@ class _Parts {
     passes = Passes(doc, wallet, writer, delegate, now);
     catalog = Catalog(source, now, fallbackPasses: fallback);
     bundles = Bundles(doc, wallet, inventory, passes, catalog, delegate, now);
+    ledger = Ledger(doc, delegate);
   }
 
   final WalletDoc doc;
@@ -78,6 +81,7 @@ class _Parts {
   late final Passes passes;
   late final Bundles bundles;
   late final Catalog catalog;
+  late final Ledger ledger;
 
   void dispose() {
     wallet.dispose();

@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart' show VoidCallback;
 import '../delegates/error_reporter.dart';
 import '../delegates/wallet_delegate.dart';
 import '../enums/spend_result.dart';
+import '../models/ledger_write.dart';
 
 /// Writes on the wallet, offline too: a write shows at once; the server answering late, or the link being down, leaves
 /// it [SpendResult.pending], and a refusal then undoes it and calls its `onRefused`.
@@ -17,8 +18,9 @@ class WalletWriter {
   /// How long a write online waits for the server before it is left to finish in the queue.
   final Duration wait;
 
-  Future<SpendResult> write(String uid, Map<String, Object?> change, {VoidCallback? onRefused}) async {
-    final write = _delegate.update(uid, change);
+  /// [change], with ledger [entry] in the same batch when given.
+  Future<SpendResult> write(String uid, Map<String, Object?> change, {LedgerWrite? entry, VoidCallback? onRefused}) async {
+    final write = _delegate.update(uid, change, entry: entry);
     if (_delegate.online) {
       try {
         await write.timeout(wait);

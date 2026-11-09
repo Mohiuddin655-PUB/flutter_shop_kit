@@ -23,7 +23,9 @@ await ShopKit.bundles.buy('starter', ShopKit.catalog.bundle('starter')!);
 - **Bundles**: items and up to 3 passes in one spend.
 - **Catalog from the server**: prices, timed sales, buying limits (`count` in each `minutes`, or for good), new items
   and passes without an app release.
-- **Server-checked**: a Firestore rules template checks every price, balance, pass and limit.
+- **Ledger**: every spend recorded as a debit in the same batch (offline too); credits and refunds written by your
+  server; read a page at a time for a history screen or support.
+- **Server-checked**: a Firestore rules template checks every price, balance, pass, limit and ledger entry.
 - **Currency-neutral and backend-agnostic**: Firestore, your own API, or memory in tests.
 
 ## How a buy flows
@@ -41,7 +43,7 @@ await ShopKit.bundles.buy('starter', ShopKit.catalog.bundle('starter')!);
        ├─ balance too low ──────────────────────► SpendResult.notEnough
        │
        ▼
- ONE write on the wallet: price off (increment), pass on, buy counted, lastWrite named
+ ONE batch: wallet (price off, pass on, buy counted, lastWrite) + its ledger debit
        │
        ├─ shows on the phone at once (ShopKit.wallet / .passes tell their listeners)
        │
@@ -115,7 +117,14 @@ The wallet document (one per account):
 ```
 
 `points` is the balance whatever your currency is called; only your server adds to it. `lastWrite` is for the security
-rules alone (they can't find which pass changed).
+rules alone (they can't find which pass changed, or which ledger entry goes with a spend).
+
+The ledger, under the wallet (`ledger/{id}`), one entry per balance movement, never changed:
+
+```json
+{ "kind": "debit", "reason": "itemBought", "ref": "hat", "amount": -100, "at": "…", "source": "app" }
+{ "kind": "credit", "reason": "packBought", "ref": "GPA.1234", "amount": 500, "at": "…", "source": "server" }
+```
 
 The catalog (times as milliseconds since the epoch, UTC, in what `CatalogDelegate` gives):
 
@@ -163,7 +172,20 @@ class FirestoreWalletDelegate implements WalletDelegate {
   @override
   Stream<Map<String, dynamic>?> watch(String uid) => _doc(uid).snapshots().map((s) => s.data());
   @override
-  Future<void> update(String uid, Map<String, Object?> change) => _doc(uid).update(change);
+  Future<void> update(String uid, Map<String, Object?> change, {LedgerWrite? entry}) {
+    final batch = _db.batch()..update(_doc(uid), change);
+    if (entry != null) batch.set(_doc(uid).collection('ledger').doc(entry.id), entry.data);
+    return batch.commit();
+  }
+  @override
+  String newEntryId(String uid) => _doc(uid).collection('ledger').doc().id;
+  @override
+  Future<List<({String id, Map<String, dynamic> data})>> ledger(String uid, {String? afterId, required int limit}) async {
+    var query = _doc(uid).collection('ledger').orderBy('at', descending: true).limit(limit);
+    if (afterId != null) query = query.startAfterDocument(await _doc(uid).collection('ledger').doc(afterId).get());
+    final page = await query.get();
+    return [for (final d in page.docs) (id: d.id, data: d.data())];
+  }
   @override
   Object increment(int by) => FieldValue.increment(by);
   @override
@@ -263,6 +285,14 @@ final text = switch (result) {
   SpendResult.overLimit => 'You have it already, or its limit is reached',
   SpendResult.offline || SpendResult.failed => "Couldn't buy it",
 };
+```
+
+A history list, a page at a time:
+
+```dart
+final entries = await ShopKit.ledger.page();               // newest 20
+final more = await ShopKit.ledger.page(after: entries.last); // the next 20
+for (final e in entries) print('${e.reason} ${e.ref}: ${e.amount}');
 ```
 
 The `example/` app is a whole shop on a wallet kept in memory, with a switch to go offline and watch buys wait.

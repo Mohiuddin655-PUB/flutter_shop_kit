@@ -1,3 +1,4 @@
+import '../models/ledger_write.dart';
 import 'catalog_delegate.dart';
 
 /// The server side of the account's wallet document, given by the app (Firestore, its own API, or a fake in tests):
@@ -9,9 +10,16 @@ abstract interface class WalletDelegate {
   /// none.
   Stream<Map<String, dynamic>?> watch(String uid);
 
-  /// [change] (field paths with dots) written on [uid]'s wallet: completes once the server has it, and throws when the
-  /// server refuses it, which undoes it in [watch].
-  Future<void> update(String uid, Map<String, Object?> change);
+  /// [change] (field paths with dots) written on [uid]'s wallet, with ledger [entry] created in the same batch when
+  /// given: completes once the server has both, and throws when the server refuses them, which undoes both.
+  Future<void> update(String uid, Map<String, Object?> change, {LedgerWrite? entry});
+
+  /// A new id for a ledger entry of [uid]'s, unique without asking the server.
+  String newEntryId(String uid);
+
+  /// [uid]'s ledger, newest first: up to [limit] entries after entry [afterId] (from the newest when null), each as its
+  /// id and stored fields.
+  Future<List<({String id, Map<String, dynamic> data})>> ledger(String uid, {String? afterId, required int limit});
 
   /// [by] added by the server, as a field's value.
   Object increment(int by);

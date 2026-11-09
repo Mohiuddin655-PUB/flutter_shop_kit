@@ -107,7 +107,7 @@ class Passes extends ChangeNotifier {
     if (change == null) return SpendResult.done;
     final counted = countBuy(_delegate, _doc.data, WalletKeys.passBuys, id, terms.limit, _now());
     if (counted == null) return SpendResult.overLimit;
-    return _balance.spend(terms.price, {...change, ...counted, ...LastWriteKeys.of(LastWriteKeys.passBought, id)});
+    return _balance.spend(terms.price, {...change, ...counted}, reason: LastWriteKeys.passBought, ref: id);
   }
 
   /// One use of pass [id] (a counter, a limited pass while it runs, a daily pass within today's count), offline too;

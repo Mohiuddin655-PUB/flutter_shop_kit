@@ -8,7 +8,9 @@ class MemoryWalletDelegate implements WalletDelegate {
   MemoryWalletDelegate({Map<String, dynamic> start = const {}}) : _server = _copy(start);
 
   Map<String, dynamic> _server;
-  final _queue = <(Map<String, Object?>, Completer<void>)>[];
+  final _ledger = <String, Map<String, dynamic>>{};
+  final _queue = <(Map<String, Object?>, LedgerWrite?, Completer<void>)>[];
+  var _ids = 0;
   final _out = StreamController<Map<String, dynamic>?>.broadcast();
   bool _online = true;
 
@@ -25,7 +27,7 @@ class MemoryWalletDelegate implements WalletDelegate {
 
   Map<String, dynamic> get _local {
     var doc = _copy(_server);
-    for (final (change, _) in _queue) {
+    for (final (change, _, _) in _queue) {
       doc = _apply(doc, change, null);
     }
     return doc;
@@ -38,9 +40,9 @@ class MemoryWalletDelegate implements WalletDelegate {
   }
 
   @override
-  Future<void> update(String uid, Map<String, Object?> change) {
+  Future<void> update(String uid, Map<String, Object?> change, {LedgerWrite? entry}) {
     final done = Completer<void>();
-    _queue.add((change, done));
+    _queue.add((change, entry, done));
     _out.add(_local);
     if (_online) scheduleMicrotask(_flush);
     return done.future;
@@ -48,11 +50,24 @@ class MemoryWalletDelegate implements WalletDelegate {
 
   void _flush() {
     while (_queue.isNotEmpty) {
-      final (change, done) = _queue.removeAt(0);
-      _server = _apply(_copy(_server), change, DateTime.now().toUtc());
+      final (change, entry, done) = _queue.removeAt(0);
+      final now = DateTime.now().toUtc();
+      _server = _apply(_copy(_server), change, now);
+      if (entry != null) _ledger[entry.id] = _apply({}, entry.data, now);
       done.complete();
     }
     _out.add(_local);
+  }
+
+  @override
+  String newEntryId(String uid) => 'e${DateTime.now().microsecondsSinceEpoch}-${++_ids}';
+
+  /// The ledger the server has, newest first (an example keeps it simple: the queue's entries show once sent).
+  @override
+  Future<List<({String id, Map<String, dynamic> data})>> ledger(String uid, {String? afterId, required int limit}) async {
+    final sorted = _ledger.entries.toList()..sort((a, b) => (b.value[LedgerKeys.at] as DateTime).compareTo(a.value[LedgerKeys.at] as DateTime));
+    final from = afterId == null ? 0 : sorted.indexWhere((e) => e.key == afterId) + 1;
+    return [for (final e in sorted.skip(from).take(limit)) (id: e.key, data: e.value)];
   }
 
   @override

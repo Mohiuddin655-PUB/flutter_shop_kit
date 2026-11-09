@@ -23,14 +23,18 @@ class FakeWalletDelegate implements WalletDelegate {
   /// The rules: true refuses the change.
   bool Function(Map<String, Object?> change)? refuse;
 
-  final _queue = <(Map<String, Object?>, Completer<void>)>[];
+  /// The server's ledger, by entry id.
+  final ledgerOnServer = <String, Map<String, dynamic>>{};
+
+  final _queue = <(Map<String, Object?>, LedgerWrite?, Completer<void>)>[];
+  var _ids = 0;
   final _watchers = <StreamController<Map<String, dynamic>?>>[];
 
   /// What the phone shows: the server's, with the queue on top.
   Map<String, dynamic>? get local {
     if (server == null && _queue.isEmpty) return null;
     var doc = _copy(server ?? {});
-    for (final (change, _) in _queue) {
+    for (final (change, _, _) in _queue) {
       doc = _apply(doc, change, null);
     }
     return doc;
@@ -45,9 +49,9 @@ class FakeWalletDelegate implements WalletDelegate {
   }
 
   @override
-  Future<void> update(String uid, Map<String, Object?> change) {
+  Future<void> update(String uid, Map<String, Object?> change, {LedgerWrite? entry}) {
     final done = Completer<void>();
-    _queue.add((change, done));
+    _queue.add((change, entry, done));
     _tell();
     if (online && !holding) scheduleMicrotask(flush);
     return done.future;
@@ -56,11 +60,12 @@ class FakeWalletDelegate implements WalletDelegate {
   /// The server takes the queue, refusing what the rules refuse.
   void flush() {
     while (_queue.isNotEmpty) {
-      final (change, done) = _queue.removeAt(0);
+      final (change, entry, done) = _queue.removeAt(0);
       if (refuse?.call(change) ?? false) {
         done.completeError(StateError('permission-denied'));
       } else {
         server = _apply(_copy(server ?? {}), change, clock.now);
+        if (entry != null) ledgerOnServer[entry.id] = _apply({}, entry.data, clock.now);
         done.complete();
       }
     }
@@ -85,6 +90,28 @@ class FakeWalletDelegate implements WalletDelegate {
     for (final c in [..._watchers]) {
       c.add(doc);
     }
+  }
+
+  @override
+  String newEntryId(String uid) => 'e${++_ids}';
+
+  /// The ledger as the phone shows it: the server's, with the queue's entries (their time still on its way).
+  @override
+  Future<List<({String id, Map<String, dynamic> data})>> ledger(String uid, {String? afterId, required int limit}) async {
+    final all = <String, Map<String, dynamic>>{
+      ...ledgerOnServer,
+      for (final (_, entry, _) in _queue)
+        if (entry != null) entry.id: _apply({}, entry.data, null),
+    };
+    final sorted = all.entries.toList()
+      ..sort((a, b) {
+        final x = a.value[LedgerKeys.at] as DateTime?, y = b.value[LedgerKeys.at] as DateTime?;
+        if (x == null || y == null) return x == null ? (y == null ? b.key.compareTo(a.key) : -1) : 1;
+        final byTime = y.compareTo(x);
+        return byTime != 0 ? byTime : b.key.compareTo(a.key);
+      });
+    final from = afterId == null ? 0 : sorted.indexWhere((e) => e.key == afterId) + 1;
+    return [for (final e in sorted.skip(from).take(limit)) (id: e.key, data: e.value)];
   }
 
   @override
