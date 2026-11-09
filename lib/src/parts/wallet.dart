@@ -7,6 +7,7 @@ import '../../keys/ledger_keys.dart';
 import '../../keys/wallet_keys.dart';
 import '../delegates/wallet_delegate.dart';
 import '../enums/spend_result.dart';
+import '../models/refused_spend.dart';
 import 'wallet_doc.dart';
 import 'wallet_writer.dart';
 
@@ -21,7 +22,8 @@ class Wallet extends ChangeNotifier {
   final WalletWriter _writer;
   final WalletDelegate _delegate;
 
-  int _amount = 0, _refused = 0;
+  int _amount = 0;
+  List<RefusedSpend> _refusals = const [];
   int? _lastPurchaseAmount;
   DateTime? _lastPurchaseAt;
 
@@ -34,9 +36,23 @@ class Wallet extends ChangeNotifier {
   DateTime? get lastPurchaseAt => _lastPurchaseAt;
   int? get lastPurchaseAmount => _lastPurchaseAmount;
 
-  /// Spends taken on this phone (offline, or answered late) that the server then refused, each undone by itself: counts
-  /// up with each one, for the screen to say so.
-  int get refusedSpends => _refused;
+  /// Spends (and passes' uses) taken on this phone, offline or answered late, that the server then refused, each undone
+  /// by itself, oldest first: for the screen to say so, each once ([seen]).
+  List<RefusedSpend> get refusals => _refusals;
+
+  /// [refusal] was shown: it leaves [refusals], so it isn't shown again.
+  void seen(RefusedSpend refusal) {
+    if (!_refusals.contains(refusal)) return;
+    _refusals = [..._refusals.where((r) => r != refusal)];
+    notifyListeners();
+  }
+
+  /// Signed out: the refusals of the account go with it.
+  void forgetRefusals() {
+    if (_refusals.isEmpty) return;
+    _refusals = const [];
+    notifyListeners();
+  }
 
   /// Takes [price] for [change] (what is bought, as the wallet's fields), unless the balance doesn't cover it, recording
   /// it in the ledger as [reason] (a [LastWriteKeys] kind, which names the write too) for [ref], in one batch. Offline it
@@ -56,12 +72,17 @@ class Wallet extends ChangeNotifier {
       LedgerKeys.source: LedgerKeys.app,
     };
     final named = LastWriteKeys.of(reason, ref, entry: id);
-    return _writer.write(uid, {...change, ...named, WalletKeys.pointsAmount: _delegate.increment(-price)}, entry: (id: id, data: entry), onRefused: refused);
+    return _writer.write(
+      uid,
+      {...change, ...named, WalletKeys.pointsAmount: _delegate.increment(-price)},
+      entry: (id: id, data: entry),
+      onRefused: () => refused(reason, ref, price),
+    );
   }
 
-  /// A spend or a use the server refused after it showed: told on screen.
-  void refused() {
-    _refused++;
+  /// A spend of [price] for [reason] of [ref] (or a use, at 0) the server refused after it showed: kept for the screen.
+  void refused(String reason, String ref, int price) {
+    _refusals = [..._refusals, RefusedSpend(reason: reason, ref: ref, price: price, at: DateTime.now())];
     notifyListeners();
   }
 

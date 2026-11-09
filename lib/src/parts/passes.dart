@@ -120,7 +120,10 @@ class Passes extends ChangeNotifier {
     final Map<String, Object?> change = p.days > 0
         ? (w == p.window ? {path(WalletKeys.used): _delegate.increment(1)} : {path(WalletKeys.window): w, path(WalletKeys.used): 1})
         : {path(WalletKeys.left): _delegate.increment(-1)};
-    final result = await _writer.write(uid, {...change, ...LastWriteKeys.of(LastWriteKeys.passUsed, id)}, onRefused: _balance.refused);
+    final result = await _writer.write(uid, {
+      ...change,
+      ...LastWriteKeys.of(LastWriteKeys.passUsed, id),
+    }, onRefused: () => _balance.refused(LastWriteKeys.passUsed, id, 0));
     return result == SpendResult.done || result == SpendResult.pending;
   }
 

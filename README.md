@@ -18,7 +18,7 @@ await ShopKit.bundles.buy('starter', ShopKit.catalog.bundle('starter')!);
 - **One entry point**: `ShopKit.setup`, `ShopKit.start`, `ShopKit.clear`, and its parts `wallet`, `inventory`, `passes`,
   `bundles`, `catalog`. Each part is a `Listenable` that tells only when its own part changes.
 - **Offline buying**: a buy shows at once, waits in the backend's queue while offline, goes through once back online,
-  and is undone by itself if the server refuses it (counted in `ShopKit.wallet.refusedSpends`).
+  and is undone by itself if the server refuses it (kept in `ShopKit.wallet.refusals` for the screen to say so, each once: `seen`).
 - **Six pass types**: duration (can stack), counter (with a most-held `max`), lifetime, daily, limited, until a date.
 - **Bundles**: items and up to 3 passes in one spend.
 - **Catalog from the server**: prices, timed sales, buying limits (`count` in each `minutes`, or for good), new items
@@ -52,7 +52,7 @@ await ShopKit.bundles.buy('starter', ShopKit.catalog.bundle('starter')!);
        │
        ├─ online, server says yes ──────────────► SpendResult.done
        ├─ offline, or server slow (10 s) ───────► SpendResult.pending   (goes through when back)
-       │        └─ server refuses later ────────► undone by itself, wallet.refusedSpends + 1
+       │        └─ server refuses later ────────► undone by itself, kept in wallet.refusals
        └─ online, server refuses ───────────────► SpendResult.failed    (undone)
 ```
 

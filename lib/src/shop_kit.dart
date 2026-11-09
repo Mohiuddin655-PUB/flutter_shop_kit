@@ -53,7 +53,10 @@ abstract final class ShopKit {
   static void start(String uid) => _p.doc.start(uid);
 
   /// Signed out: nothing of the account stays.
-  static Future<void> clear() => _p.doc.clear();
+  static Future<void> clear() {
+    _p.wallet.forgetRefusals();
+    return _p.doc.clear();
+  }
 
   /// Undoes [setup], so a test can set it up anew.
   @visibleForTesting

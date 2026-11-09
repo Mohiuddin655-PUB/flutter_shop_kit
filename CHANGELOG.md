@@ -1,3 +1,11 @@
+## 0.5.0
+
+- **Refusals**: a spend (or a pass's use) the server refused after it showed is kept in `ShopKit.wallet.refusals`
+  (`RefusedSpend`: its reason, ref, price given back and time), oldest first, until `ShopKit.wallet.seen(refusal)`, so
+  the screen can say so once each; `ShopKit.clear()` forgets them.
+- **Breaking**: `Wallet.refusedSpends` is gone (use `refusals.length`), and `Wallet.refused` takes the refused
+  spend's reason, ref and price.
+
 ## 0.4.0
 
 - **Refund debt**: `ShopKit.wallet.debt` is what is owed when the balance is below zero (a server taking back a refund

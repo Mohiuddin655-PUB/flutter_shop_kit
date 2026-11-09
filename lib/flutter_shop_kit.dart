@@ -19,6 +19,7 @@ export 'src/models/ledger_write.dart';
 export 'src/models/offer.dart';
 export 'src/models/pass_state.dart';
 export 'src/models/pass_terms.dart';
+export 'src/models/refused_spend.dart';
 export 'src/parts/wallet.dart';
 export 'src/parts/bundles.dart';
 export 'src/parts/catalog.dart';

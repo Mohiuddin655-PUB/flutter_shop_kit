@@ -43,7 +43,10 @@ void main() {
     await TestShopKit.settle();
     expect(ShopKit.wallet.amount, 1000);
     expect(ShopKit.inventory.owns('a1'), isFalse);
-    expect(ShopKit.wallet.refusedSpends, 1);
+    final refusal = ShopKit.wallet.refusals.single;
+    expect((refusal.reason, refusal.ref, refusal.price), (LastWriteKeys.itemBought, 'a1', 100));
+    ShopKit.wallet.seen(refusal);
+    expect(ShopKit.wallet.refusals, isEmpty);
   });
 
   test('online, a refused buy fails and changes nothing', () async {
@@ -61,5 +64,19 @@ void main() {
     t.delegate.goOnline();
     await TestShopKit.settle();
     expect(t.delegate.server![WalletKeys.items], ['a1']);
+  });
+
+  test('each refusal is kept once, for its own spend, and goes at sign-out', () async {
+    final t = await TestShopKit.make();
+    t.delegate.online = false;
+    t.delegate.refuse = (_) => true;
+    await ShopKit.inventory.buy('a1', 100);
+    await ShopKit.passes.buy('filters', ShopKit.catalog.pass('filters')!);
+    t.delegate.goOnline();
+    await TestShopKit.settle();
+    await TestShopKit.settle();
+    expect([for (final r in ShopKit.wallet.refusals) r.ref], ['a1', 'filters']);
+    await ShopKit.clear();
+    expect(ShopKit.wallet.refusals, isEmpty);
   });
 }
