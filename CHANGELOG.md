@@ -1,3 +1,8 @@
+## 0.9.1
+
+- **A pass's and a bundle's offer**: `ShopKit.catalog.passOffer(id)` and `bundleOffer(id)` give the price and sale, as
+  `offer(id)` does for an item, so a card can show the full price struck out while a sale runs.
+
 ## 0.9.0
 
 - **Ledger and history on or off, by the app**: `ShopKit.setup(ledger: () => …, history: () => …)`, asked at each use

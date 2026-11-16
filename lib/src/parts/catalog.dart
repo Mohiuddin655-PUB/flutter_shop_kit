@@ -55,11 +55,18 @@ class Catalog extends ChangeNotifier {
   /// Pass [id]'s terms now (its sale's price while the sale runs); null when it isn't sold.
   PassTerms? pass(String id) => _passes[id]?.termsAt(_now());
 
+  /// Pass [id]'s price and sale, as [offer] gives an item's (its full price while a sale runs, to show struck out);
+  /// null when it isn't sold.
+  Offer? passOffer(String id) => _passes[id]?.offer;
+
   /// The bundles sold, by id.
   Iterable<String> get bundleIds => _bundles.keys;
 
   /// Bundle [id]'s terms now (its sale's price while the sale runs); null when it isn't sold.
   BundleTerms? bundle(String id) => _bundles[id]?.termsAt(_now());
+
+  /// Bundle [id]'s price and sale, as [passOffer]; null when it isn't sold.
+  Offer? bundleOffer(String id) => _bundles[id]?.offer;
 
   /// Reads the server's catalog when its version differs from the copy's; a second caller waits for the first.
   Future<void> refresh() {

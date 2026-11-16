@@ -48,6 +48,30 @@ void main() {
     expect(ShopKit.catalog.sells('zz'), isFalse);
   });
 
+  test("a pass's and a bundle's offer give the price before a sale", () async {
+    final t = await TestShopKit.make();
+    ShopKit.reset();
+    ShopKit.setup(
+      walletDelegate: t.delegate,
+      now: () => t.clock.now,
+      catalogDelegate: _Empty(),
+      fallbackPasses: {
+        'filters': {
+          CatalogKeys.type: 'duration',
+          CatalogKeys.minutes: 60,
+          CatalogKeys.price: 100,
+          CatalogKeys.sale: {CatalogKeys.price: 80, CatalogKeys.until: t.clock.now.add(const Duration(days: 1)).millisecondsSinceEpoch},
+        },
+      },
+    );
+    final offer = ShopKit.catalog.passOffer('filters')!;
+    expect(offer.price, 100);
+    expect(offer.onSale(t.clock.now), isTrue);
+    expect(ShopKit.catalog.pass('filters')?.price, 80);
+    expect(ShopKit.catalog.passOffer('none'), isNull);
+    expect(ShopKit.catalog.bundleOffer('none'), isNull);
+  });
+
   test('before any copy, the fallback passes are sold', () async {
     final t = await TestShopKit.make();
     ShopKit.reset();
